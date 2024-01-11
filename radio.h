@@ -19,124 +19,153 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+
 #include "dcs.h"
+#include "frequencies.h"
 
 enum {
-	MR_CH_SCANLIST1 = (1U << 7),
-	MR_CH_SCANLIST2 = (1U << 6),
-	MR_CH_BAND_MASK = 0x0FU,
+	RADIO_CHANNEL_UP   = 0x01u,
+	RADIO_CHANNEL_DOWN = 0xFFu,
 };
 
 enum {
-	RADIO_CHANNEL_UP = 0x01U,
-	RADIO_CHANNEL_DOWN = 0xFFU,
-};
-
-enum {
-	BANDWIDTH_WIDE = 0U,
-	BANDWIDTH_NARROW = 1U,
+	BANDWIDTH_WIDE = 0,
+	BANDWIDTH_NARROW
 };
 
 enum PTT_ID_t {
-	PTT_ID_OFF  = 0U,
-	PTT_ID_BOT  = 1U,
-	PTT_ID_EOT  = 2U,
-	PTT_ID_BOTH = 3U,
+	PTT_ID_OFF = 0,    // OFF
+	PTT_ID_TX_UP,      // BEGIN OF TX
+	PTT_ID_TX_DOWN,    // END OF TX
+	PTT_ID_BOTH,       // BOTH
+	PTT_ID_APOLLO      // Apolo quindar tones
 };
-
 typedef enum PTT_ID_t PTT_ID_t;
 
-enum STEP_Setting_t {
-	STEP_2_5kHz,
-	STEP_5_0kHz,
-	STEP_6_25kHz,
-	STEP_10_0kHz,
-	STEP_12_5kHz,
-	STEP_25_0kHz,
-	STEP_8_33kHz,
+enum VfoState_t
+{
+	VFO_STATE_NORMAL = 0,
+	VFO_STATE_BUSY,
+	VFO_STATE_BAT_LOW,
+	VFO_STATE_TX_DISABLE,
+	VFO_STATE_TIMEOUT,
+	VFO_STATE_ALARM,
+	VFO_STATE_VOLTAGE_HIGH,
+	_VFO_STATE_LAST_ELEMENT
 };
-
-typedef enum STEP_Setting_t STEP_Setting_t;
-
-enum VfoState_t {
-	VFO_STATE_NORMAL     = 0U,
-	VFO_STATE_BUSY       = 1U,
-	VFO_STATE_BAT_LOW    = 2U,
-	VFO_STATE_TX_DISABLE = 3U,
-	VFO_STATE_TIMEOUT    = 4U,
-	VFO_STATE_ALARM      = 5U,
-	VFO_STATE_VOL_HIGH   = 6U,
-};
-
 typedef enum VfoState_t VfoState_t;
 
-typedef struct {
-	uint32_t Frequency;
-	DCS_CodeType_t CodeType;
-	uint8_t Code;
-	uint8_t Padding[2];
-} FREQ_Config_t;
+typedef enum {
+	MODULATION_FM,
+	MODULATION_AM,
+	MODULATION_USB,
 
-typedef struct VFO_Info_t {
-	FREQ_Config_t ConfigRX;
-	FREQ_Config_t ConfigTX;
-	FREQ_Config_t *pRX;
-	FREQ_Config_t *pTX;
-	uint32_t FREQUENCY_OF_DEVIATION;
-	uint16_t StepFrequency;
-	uint8_t CHANNEL_SAVE;
-	uint8_t FREQUENCY_DEVIATION_SETTING;
-	uint8_t SquelchOpenRSSI;
-	uint8_t SquelchOpenNoise;
-	uint8_t SquelchCloseGlitch;
-	uint8_t SquelchCloseRSSI;
-	uint8_t SquelchCloseNoise;
-	uint8_t SquelchOpenGlitch;
-	STEP_Setting_t STEP_SETTING;
-	uint8_t OUTPUT_POWER;
-	uint8_t TXP_CalculatedSetting;
-	bool FrequencyReverse;
-	uint8_t SCRAMBLING_TYPE;
-	uint8_t CHANNEL_BANDWIDTH;
-	uint8_t SCANLIST1_PARTICIPATION;
-	uint8_t SCANLIST2_PARTICIPATION;
-	uint8_t Band;
-	uint8_t DTMF_DECODING_ENABLE;
-	PTT_ID_t DTMF_PTT_ID_TX_MODE;
-	uint8_t BUSY_CHANNEL_LOCK;
-	uint8_t AM_CHANNEL_MODE;
-	bool IsAM;
-	char Name[16];
-} VFO_Info_t;
-
-extern VFO_Info_t *gTxVfo;
-extern VFO_Info_t *gRxVfo;
-extern VFO_Info_t *gCurrentVfo;
-
-extern DCS_CodeType_t gCurrentCodeType;
-extern DCS_CodeType_t gSelectedCodeType;
-extern uint8_t gSelectedCode;
-
-extern STEP_Setting_t gStepSetting;
-
-extern VfoState_t VfoState[2];
-
-bool RADIO_CheckValidChannel(uint16_t ChNum, bool bCheckScanList, uint8_t RadioNum);
-uint8_t RADIO_FindNextChannel(uint8_t ChNum, int8_t Direction, bool bCheckScanList, uint8_t RadioNum);
-void RADIO_InitInfo(VFO_Info_t *pInfo, uint8_t ChannelSave, uint8_t ChIndex, uint32_t Frequency);
-void RADIO_ConfigureChannel(uint8_t RadioNum, uint32_t Arg);
-void RADIO_ConfigureSquelchAndOutputPower(VFO_Info_t *pInfo);
-void RADIO_ApplyOffset(VFO_Info_t *pInfo);
-void RADIO_SelectVfos(void);
-void RADIO_SetupRegisters(bool bSwitchToFunction0);
-void RADIO_ConfigureNOAA(void);
-void RADIO_SetTxParameters(void);
-
-void RADIO_SetVfoState(VfoState_t State);
-void RADIO_PrepareTX(void);
-void RADIO_EnableCxCSS(void);
-void RADIO_PrepareCssTX(void);
-void RADIO_SendEndOfTransmission(void);
-
+#ifdef ENABLE_BYP_RAW_DEMODULATORS
+	MODULATION_BYP,
+	MODULATION_RAW,
 #endif
 
+	MODULATION_UKNOWN
+} ModulationMode_t;
+
+extern const char gModulationStr[MODULATION_UKNOWN][4];
+
+typedef struct
+{
+	uint32_t       Frequency;
+	DCS_CodeType_t CodeType;
+	uint8_t        Code;
+	uint8_t        Padding[2];
+} FREQ_Config_t;
+
+typedef struct VFO_Info_t
+{
+	FREQ_Config_t  freq_config_RX;
+	FREQ_Config_t  freq_config_TX;
+
+	// this is for a purpose of the FrequencyReverse function
+	// it points to freq_config_RX normally and to freq_config_TX if reverse function is active
+	//
+	FREQ_Config_t *pRX;
+
+	// this is for a purpose of the FrequencyReverse function
+	// it points to freq_config_TX normally and to freq_config_RX if reverse function is active
+	FREQ_Config_t *pTX;
+
+	uint32_t       TX_OFFSET_FREQUENCY;
+	uint16_t       StepFrequency;
+
+	uint8_t        CHANNEL_SAVE;
+
+	uint8_t        TX_OFFSET_FREQUENCY_DIRECTION;
+
+	uint8_t        SquelchOpenRSSIThresh;
+	uint8_t        SquelchOpenNoiseThresh;
+	uint8_t        SquelchCloseGlitchThresh;
+	uint8_t        SquelchCloseRSSIThresh;
+	uint8_t        SquelchCloseNoiseThresh;
+	uint8_t        SquelchOpenGlitchThresh;
+
+	STEP_Setting_t STEP_SETTING;
+	uint8_t        OUTPUT_POWER;
+	uint8_t        TXP_CalculatedSetting;
+	bool           FrequencyReverse;
+
+	uint8_t        SCRAMBLING_TYPE;
+	uint8_t        CHANNEL_BANDWIDTH;
+
+	uint8_t        SCANLIST1_PARTICIPATION;
+	uint8_t        SCANLIST2_PARTICIPATION;
+
+	uint8_t        Band;
+#ifdef ENABLE_DTMF_CALLING
+	uint8_t        DTMF_DECODING_ENABLE;
+#endif
+	PTT_ID_t       DTMF_PTT_ID_TX_MODE;
+
+	uint8_t        BUSY_CHANNEL_LOCK;
+
+	ModulationMode_t    Modulation;
+
+	uint8_t        Compander;
+
+	char           Name[16];
+} VFO_Info_t;
+
+// Settings of the main VFO that is selected by the user
+// The pointer follows gEeprom.TX_VFO index
+extern VFO_Info_t    *gTxVfo;
+
+// Settings of the actual VFO that is now used for RX,
+// It is being alternated by dual watch, and flipped by crossband
+// The pointer follows gEeprom.RX_VFO
+extern VFO_Info_t    *gRxVfo;
+
+// Equal to gTxVfo unless dual watch changes it on incomming transmition (this can only happen when XB off and DW on)
+extern VFO_Info_t    *gCurrentVfo;
+
+extern DCS_CodeType_t gCurrentCodeType;
+
+extern VfoState_t     VfoState[2];
+
+bool     RADIO_CheckValidChannel(uint16_t channel, bool checkScanList, uint8_t scanList);
+uint8_t  RADIO_FindNextChannel(uint8_t ChNum, int8_t Direction, bool bCheckScanList, uint8_t RadioNum);
+void     RADIO_InitInfo(VFO_Info_t *pInfo, const uint8_t ChannelSave, const uint32_t Frequency);
+void     RADIO_ConfigureChannel(const unsigned int VFO, const unsigned int configure);
+void     RADIO_ConfigureSquelchAndOutputPower(VFO_Info_t *pInfo);
+void     RADIO_ApplyOffset(VFO_Info_t *pInfo);
+void     RADIO_SelectVfos(void);
+void     RADIO_SetupRegisters(bool switchToForeground);
+#ifdef ENABLE_NOAA
+	void RADIO_ConfigureNOAA(void);
+#endif
+void     RADIO_SetTxParameters(void);
+void 	 RADIO_SetupAGC(bool listeningAM, bool disable);
+void     RADIO_SetModulation(ModulationMode_t modulation);
+void     RADIO_SetVfoState(VfoState_t State);
+void     RADIO_PrepareTX(void);
+void     RADIO_EnableCxCSS(void);
+void     RADIO_PrepareCssTX(void);
+void     RADIO_SendEndOfTransmission(void);
+
+#endif

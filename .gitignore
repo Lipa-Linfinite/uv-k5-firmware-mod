@@ -1,7 +1,11 @@
-*.o
 *.d
+*.o
+firmware
+/firmware.packed.bin
+/firmware.bin
 /compiled-firmware
-link-overlay.S
-sram-overlay
-sram-overlay.bin
-
+.cache
+compile_commands.json
+.vscode
+/docs
+k5_eeprom.raw

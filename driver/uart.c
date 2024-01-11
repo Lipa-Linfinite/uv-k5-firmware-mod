@@ -102,4 +102,3 @@ void UART_LogSend(const void *pBuffer, uint32_t Size)
 		UART_Send(pBuffer, Size);
 	}
 }
-
