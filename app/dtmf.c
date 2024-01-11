@@ -18,17 +18,17 @@
 #if defined(ENABLE_FMRADIO)
 #include "app/fm.h"
 #endif
-#include "app/scanner.h"
-#include "bsp/dp32g030/gpio.h"
-#include "driver/bk4819.h"
-#include "driver/eeprom.h"
-#include "driver/gpio.h"
-#include "driver/system.h"
+#include "scanner.h"
+#include "../bsp/dp32g030/gpio.h"
+#include "../driver/bk4819.h"
+#include "../driver/eeprom.h"
+#include "../driver/gpio.h"
+#include "../driver/system.h"
 #include "dtmf.h"
-#include "external/printf/printf.h"
-#include "misc.h"
-#include "settings.h"
-#include "ui/ui.h"
+#include "../external/printf/printf.h"
+#include "../misc.h"
+#include "../settings.h"
+#include "../ui/ui.h"
 
 char gDTMF_String[15];
 char gDTMF_InputBox[15];
@@ -149,7 +149,7 @@ bool DTMF_CompareMessage(const char *pMsg, const char *pTemplate, uint8_t Size, 
 	return true;
 }
 
-DTMF_CallMode_t DTMF_CheckGroupCall(const char *pMsg, uint32_t Size)
+bool DTMF_CheckGroupCall(const char *pMsg, uint32_t Size)
 {
 	uint32_t i;
 
@@ -159,10 +159,10 @@ DTMF_CallMode_t DTMF_CheckGroupCall(const char *pMsg, uint32_t Size)
 		}
 	}
 	if (i != Size) {
-		return DTMF_CALL_MODE_GROUP;
+		return true;
 	}
 
-	return DTMF_CALL_MODE_NOT_GROUP;
+	return false;
 }
 
 void DTMF_Append(char Code)
@@ -191,42 +191,8 @@ void DTMF_HandleRequest(void)
 		return;
 	}
 
-	if (!gRxVfo->DTMF_DECODING_ENABLE && !gSetting_KILLED) {
-		return;
-	}
-
 	if (gDTMF_WriteIndex >= 9) {
-		Offset = gDTMF_WriteIndex - 9;
-		sprintf(String, "%s%c%s", gEeprom.ANI_DTMF_ID, gEeprom.DTMF_SEPARATE_CODE, gEeprom.KILL_CODE);
-		if (DTMF_CompareMessage(gDTMF_Received + Offset, String, 9, true)) {
-			if (gEeprom.PERMIT_REMOTE_KILL) {
-				gSetting_KILLED = true;
-				SETTINGS_SaveSettings();
-				gDTMF_ReplyState = DTMF_REPLY_AB;
-#if defined(ENABLE_FMRADIO)
-				if (gFmRadioMode) {
-					FM_TurnOff();
-					GUI_SelectNextDisplay(DISPLAY_MAIN);
-				}
-#endif
-			} else {
-				gDTMF_ReplyState = DTMF_REPLY_NONE;
-			}
-			gDTMF_CallState = DTMF_CALL_STATE_NONE;
-			gUpdateDisplay = true;
-			gUpdateStatus = true;
-			return;
-		}
-		sprintf(String, "%s%c%s", gEeprom.ANI_DTMF_ID, gEeprom.DTMF_SEPARATE_CODE, gEeprom.REVIVE_CODE);
-		if (DTMF_CompareMessage(gDTMF_Received + Offset, String, 9, true)) {
-			gSetting_KILLED = false;
-			SETTINGS_SaveSettings();
-			gDTMF_ReplyState = DTMF_REPLY_AB;
-			gDTMF_CallState = DTMF_CALL_STATE_NONE;
-			gUpdateDisplay = true;
-			gUpdateStatus = true;
-			return;
-		}
+        return;
 	}
 
 	if (gDTMF_WriteIndex >= 2) {
@@ -246,7 +212,7 @@ void DTMF_HandleRequest(void)
 		}
 	}
 
-	if (gSetting_KILLED || gDTMF_CallState != DTMF_CALL_STATE_NONE) {
+	if (gDTMF_CallState != DTMF_CALL_STATE_NONE) {
 		return;
 	}
 

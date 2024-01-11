@@ -16,192 +16,125 @@
 
 #include "frequencies.h"
 #include "misc.h"
+#include "radio.h"
 #include "settings.h"
 
-const uint32_t LowerLimitFrequencyBandTable[7] = {
-	 5000000,
-	10800000,
-	13600000,
-	17400000,
-	35000000,
-	40000000,
-	47000000,
+const struct FrequencyBandInfo FrequencyBandTable[7] = {
+    [BAND1_50MHz] = {.lower = 1500000, .upper = 10799990},
+    [BAND2_108MHz] = {.lower = 10800000, .upper = 13599990},
+    [BAND3_136MHz] = {.lower = 13600000, .upper = 17399990},
+    [BAND4_174MHz] = {.lower = 17400000, .upper = 34999990},
+    [BAND5_350MHz] = {.lower = 35000000, .upper = 39999990},
+    [BAND6_400MHz] = {.lower = 40000000, .upper = 46999990},
+    [BAND7_470MHz] = {.lower = 47000000, .upper = 134000000},
 };
 
-const uint32_t MiddleFrequencyBandTable[7] = {
-	 6500000,
-	12200000,
-	15000000,
-	26000000,
-	37000000,
-	43500000,
-	55000000,
+const uint16_t StepFrequencyTable[12] = {
+    1,   10,  50,  100,
+
+    250, 500, 625, 833, 1000, 1250, 2500, 10000,
 };
 
-const uint32_t UpperLimitFrequencyBandTable[7] = {
-	 7600000,
-	13599990,
-	17399990,
-	34999990,
-	39999990,
-	46999990,
-	60000000,
-};
+const uint32_t upConverterValues[] = {0, 5000000, 12500000};
 
-#if defined(ENABLE_NOAA)
-const uint32_t NoaaFrequencyTable[10] = {
-	16255000,
-	16240000,
-	16247500,
-	16242500,
-	16245000,
-	16250000,
-	16252500,
-	16152500,
-	16177500,
-	16327500,
-};
-#endif
+FREQUENCY_Band_t FREQUENCY_GetBand(uint32_t Frequency) {
+  for (int i = 0; i < ARRAY_SIZE(FrequencyBandTable); i++) {
+    if (Frequency >= FrequencyBandTable[i].lower &&
+        Frequency <= FrequencyBandTable[i].upper) {
+      return i;
+    }
+  }
 
-const uint16_t StepFrequencyTable[7] = {
-	250,
-	500,
-	625,
-	1000,
-	1250,
-	2500,
-	833,
-};
-
-FREQUENCY_Band_t FREQUENCY_GetBand(uint32_t Frequency)
-{
-	if (Frequency >=  5000000 && Frequency <=  7600000) {
-		return BAND1_50MHz;
-	}
-	if (Frequency >= 10800000 && Frequency <= 13599990) {
-		return BAND2_108MHz;
-	}
-	if (Frequency >= 13600000 && Frequency <= 17399990) {
-		return BAND3_136MHz;
-	}
-	if (Frequency >= 17400000 && Frequency <= 34999990) {
-		return BAND4_174MHz;
-	}
-	if (Frequency >= 35000000 && Frequency <= 39999990) {
-		return BAND5_350MHz;
-	}
-	if (Frequency >= 40000000 && Frequency <= 46999990) {
-		return BAND6_400MHz;
-	}
-	if (Frequency >= 47000000 && Frequency <= 60000000) {
-		return BAND7_470MHz;
-	}
-
-	return BAND6_400MHz;
+  return BAND6_400MHz;
 }
 
-uint8_t FREQUENCY_CalculateOutputPower(uint8_t TxpLow, uint8_t TxpMid, uint8_t TxpHigh, int32_t LowerLimit, int32_t Middle, int32_t UpperLimit, int32_t Frequency)
-{
-	if (Frequency <= LowerLimit) {
-		return TxpLow;
-	}
-	if (UpperLimit <= Frequency) {
-		return TxpHigh;
-	}
-	if (Frequency <= Middle) {
-		TxpMid += ((TxpMid - TxpLow) * (Frequency - LowerLimit)) / (Middle - LowerLimit);
-		return TxpMid;
-	}
+uint8_t FREQUENCY_CalculateOutputPower(uint8_t TxpLow, uint8_t TxpMid,
+                                       uint8_t TxpHigh, int32_t LowerLimit,
+                                       int32_t Middle, int32_t UpperLimit,
+                                       int32_t Frequency) {
+  if (Frequency <= LowerLimit) {
+    return TxpLow;
+  }
+  if (UpperLimit <= Frequency) {
+    return TxpHigh;
+  }
+  if (Frequency <= Middle) {
+    TxpMid +=
+        ((TxpMid - TxpLow) * (Frequency - LowerLimit)) / (Middle - LowerLimit);
+    return TxpMid;
+  }
 
-	TxpMid += ((TxpHigh - TxpMid) * (Frequency - Middle)) / (UpperLimit - Middle);
-	return TxpMid;
+  TxpMid += ((TxpHigh - TxpMid) * (Frequency - Middle)) / (UpperLimit - Middle);
+  return TxpMid;
 }
 
-uint32_t FREQUENCY_FloorToStep(uint32_t Upper, uint32_t Step, uint32_t Lower)
-{
-	uint32_t Index;
+uint32_t FREQUENCY_FloorToStep(uint32_t Upper, uint32_t Step, uint32_t Lower) {
+  uint32_t Index;
 
-	Index = (Upper - Lower) / Step;
-	return Lower + (Step * Index);
+  if (Step == 833) {
+    const uint32_t Delta = Upper - Lower;
+    uint32_t Base = (Delta / 2500) * 2500;
+    const uint32_t Index = ((Delta - Base) % 2500) / 833;
+
+    if (Index == 2) {
+      Base++;
+    }
+
+    return Lower + Base + (Index * 833);
+  }
+
+  Index = (Upper - Lower) / Step;
+
+  return Lower + (Step * Index);
 }
 
-int FREQUENCY_Check(VFO_Info_t *pInfo)
-{
-	uint32_t Frequency;
+bool IsTXAllowed(uint32_t Frequency) {
+  if (gUpconverter) {
+    return false;
+  }
 
-	if (pInfo->CHANNEL_SAVE > FREQ_CHANNEL_LAST) {
-		return -1;
-	}
-	Frequency = pInfo->pTX->Frequency;
-	switch (gSetting_F_LOCK) {
-	case F_LOCK_FCC:
-		if (Frequency >= 14400000 && Frequency <= 14799990) {
-			return 0;
-		}
-		if (Frequency >= 42000000 && Frequency <= 44999990) {
-			return 0;
-		}
-		break;
+  if (gSetting_ALL_TX == 2) {
+    return false;
+  }
 
-	case F_LOCK_CE:
-		if (Frequency >= 14400000 && Frequency <= 14599990) {
-			return 0;
-		}
-		break;
+  if (gSetting_ALL_TX == 1) {
+    return true;
+  }
 
-	case F_LOCK_GB:
-		if (Frequency >= 14400000 && Frequency <= 14799990) {
-			return 0;
-		}
-		if (Frequency >= 43000000 && Frequency <= 43999990) {
-			return 0;
-		}
-		break;
+  switch (gSetting_F_LOCK) {
+  case F_LOCK_FCC:
+    return (Frequency >= 14400000 && Frequency <= 14799990) ||
+           (Frequency >= 42000000 && Frequency <= 44999990);
 
-	case F_LOCK_430:
-		if (Frequency >= 13600000 && Frequency <= 17399990) {
-			return 0;
-		}
-		if (Frequency >= 40000000 && Frequency <= 42999990) {
-			return 0;
-		}
-		break;
+  case F_LOCK_CE:
+    return Frequency >= 14400000 && Frequency <= 14599990;
 
-	case F_LOCK_438:
-		if (Frequency >= 13600000 && Frequency <= 17399990) {
-			return 0;
-		}
-		if (Frequency >= 40000000 && Frequency <= 43799990) {
-			return 0;
-		}
-		break;
+  case F_LOCK_GB:
+    return (Frequency >= 14400000 && Frequency <= 14799990) ||
+           (Frequency >= 43000000 && Frequency <= 43999990);
 
-	default:
-		if (Frequency >= 13600000 && Frequency <= 17399990) {
-			return 0;
-		}
-		if (Frequency >= 35000000 && Frequency <= 39999990) {
-			if (gSetting_350TX && gSetting_350EN) {
-				return 0;
-			}
-		}
-		if (Frequency >= 40000000 && Frequency <= 46999990) {
-			return 0;
-		}
-		if (Frequency >= 17400000 && Frequency <= 34999990) {
-			if (gSetting_200TX) {
-				return 0;
-			}
-		}
+  case F_LOCK_LPD_PMR:
+    return (Frequency >= 43300000 && Frequency <= 43499990) ||
+           (Frequency >= 44600000 && Frequency <= 44619990);
 
-		if (Frequency >= 47000000 && Frequency <= 60000000) {
-			if (gSetting_500TX) {
-				return 0;
-			}
-		}
-		break;
-	}
+  default:
+    return (Frequency >= 13600000 && Frequency <= 17399990) ||
+           (Frequency >= 40000000 && Frequency <= 46999990) ||
+           (gSetting_350TX && Frequency >= 35000000 && Frequency <= 39999990) ||
+           (gSetting_200TX && Frequency >= 17400000 && Frequency <= 34999990) ||
+           (gSetting_500TX && Frequency >= 47000000 && Frequency <= 60000000);
+  }
 
-	return -1;
+  return false;
 }
 
+bool FREQUENCY_Check(VFO_Info_t *pInfo) {
+  if (pInfo->CHANNEL_SAVE > FREQ_CHANNEL_LAST) {
+    return false;
+  }
+
+  return IsTXAllowed(pInfo->pTX->Frequency);
+}
+
+uint32_t GetScreenF(uint32_t f) { return f - upConverterValues[gUpconverter]; }
+uint32_t GetTuneF(uint32_t f) { return f + upConverterValues[gUpconverter]; }

@@ -44,6 +44,14 @@
 #include "sram-overlay.h"
 #endif
 
+static const uint32_t gDefaultFrequencyTable[5] = {
+	14502500,
+	14552500,
+	43477500,
+	43502500,
+	43697500,
+};
+
 #if defined(ENABLE_OVERLAY)
 void BOARD_FLASH_Init(void)
 {
@@ -526,11 +534,11 @@ void BOARD_EEPROM_Init(void)
 
 	// 0E78..0E7F
 	EEPROM_ReadBuffer(0x0E78, Data, 8);
-	gEeprom.CHANNEL_DISPLAY_MODE  = (Data[1] < 3) ? Data[1] : MDF_FREQUENCY;
+	gEeprom.CHANNEL_DISPLAY_MODE  = (Data[1] < 4) ? Data[1] : MDF_FREQUENCY;
 	gEeprom.CROSS_BAND_RX_TX      = (Data[2] < 3) ? Data[2] : CROSS_BAND_OFF;
 	gEeprom.BATTERY_SAVE          = (Data[3] < 5) ? Data[3] : 4;
 	gEeprom.DUAL_WATCH            = (Data[4] < 3) ? Data[4] : DUAL_WATCH_CHAN_A;
-	gEeprom.BACKLIGHT             = (Data[5] < 6) ? Data[5] : 5;
+	gEeprom.BACKLIGHT             = (Data[5] < 7) ? Data[5] : 6;
 	gEeprom.TAIL_NOTE_ELIMINATION = (Data[6] < 2) ? Data[6] : true;
 	gEeprom.VFO_OPEN              = (Data[7] < 2) ? Data[7] : true;
 
@@ -542,10 +550,6 @@ void BOARD_EEPROM_Init(void)
 	gEeprom.MrChannel[1]     = IS_MR_CHANNEL(Data[4])    ? Data[4] : MR_CHANNEL_FIRST;
 	gEeprom.FreqChannel[0]   = IS_FREQ_CHANNEL(Data[2])  ? Data[2] : (FREQ_CHANNEL_FIRST + BAND6_400MHz);
 	gEeprom.FreqChannel[1]   = IS_FREQ_CHANNEL(Data[5])  ? Data[5] : (FREQ_CHANNEL_FIRST + BAND6_400MHz);
-#if defined(ENABLE_NOAA)
-	gEeprom.NoaaChannel[0]   = IS_NOAA_CHANNEL(Data[6])  ? Data[6] : NOAA_CHANNEL_FIRST;
-	gEeprom.NoaaChannel[1]   = IS_NOAA_CHANNEL(Data[7])  ? Data[7] : NOAA_CHANNEL_FIRST;
-#endif
 
 #if defined(ENABLE_FMRADIO)
 	// 0E88..0E8F
@@ -582,7 +586,7 @@ void BOARD_EEPROM_Init(void)
 	gEeprom.KEY_2_LONG_PRESS_ACTION  = (Data[4] < 9) ? Data[4] : 6;
 	gEeprom.SCAN_RESUME_MODE         = (Data[5] < 3) ? Data[5] : SCAN_RESUME_CO;
 	gEeprom.AUTO_KEYPAD_LOCK         = (Data[6] < 2) ? Data[6] : true;
-	gEeprom.POWER_ON_DISPLAY_MODE    = (Data[7] < 3) ? Data[7] : POWER_ON_DISPLAY_MODE_MESSAGE;
+	gEeprom.POWER_ON_DISPLAY_MODE    = (Data[7] < 3) ? Data[7] : POWER_ON_DISPLAY_MODE_VOLTAGE;
 
 	// 0E98..0E9F
 	EEPROM_ReadBuffer(0x0E98, Data, 8);
@@ -594,12 +598,9 @@ void BOARD_EEPROM_Init(void)
 
 	// 0EA8..0EAF
 	EEPROM_ReadBuffer(0x0EA8, Data, 8);
-#if defined(ENABLE_ALARM)
-	gEeprom.ALARM_MODE                     = (Data[0] <  2) ? Data[0] : true;
-#endif
 	gEeprom.ROGER                          = (Data[1] <  3) ? Data[1] : ROGER_MODE_OFF;
 	gEeprom.REPEATER_TAIL_TONE_ELIMINATION = (Data[2] < 11) ? Data[2] : 0;
-	gEeprom.TX_VFO                         = (Data[3] <  2) ? Data[3] : 0;
+	gEeprom.TX_VFO                     = (Data[3] <  2) ? Data[3] : 0;
 
 	// 0ED0..0ED7
 	EEPROM_ReadBuffer(0x0ED0, Data, 8);
@@ -628,12 +629,7 @@ void BOARD_EEPROM_Init(void)
 	}
 
 	// 0EE8..0EEF
-	EEPROM_ReadBuffer(0x0EE8, Data, 8);
-	if (DTMF_ValidateCodes((char *)Data, 8)) {
-		memcpy(gEeprom.KILL_CODE, Data, 8);
-	} else {
-		memcpy(gEeprom.KILL_CODE, "ABCD9\0\0", 8);
-	}
+    // Killcode removed
 
 	// 0EF0..0EF7
 	EEPROM_ReadBuffer(0x0EF0, Data, 8);
@@ -675,14 +671,10 @@ void BOARD_EEPROM_Init(void)
 	EEPROM_ReadBuffer(0x0F40, Data, 8);
 	gSetting_F_LOCK         = (Data[0] < 6) ? Data[0] : F_LOCK_OFF;
 
-	gUpperLimitFrequencyBandTable = UpperLimitFrequencyBandTable;
-	gLowerLimitFrequencyBandTable = LowerLimitFrequencyBandTable;
-
 	gSetting_350TX          = (Data[1] < 2) ? Data[1] : true;
-	gSetting_KILLED         = (Data[2] < 2) ? Data[2] : false;
 	gSetting_200TX          = (Data[3] < 2) ? Data[3] : false;
 	gSetting_500TX          = (Data[4] < 2) ? Data[4] : false;
-	gSetting_350EN          = (Data[5] < 2) ? Data[5] : true;
+	gSetting_ALL_TX          = (Data[5] < 2) ? Data[5] : 2;
 	gSetting_ScrambleEnable = (Data[6] < 2) ? Data[6] : true;
 
 	if (!gEeprom.VFO_OPEN) {
@@ -773,6 +765,17 @@ void BOARD_FactoryReset(bool bIsAll)
 				!(i >= 0x0E88 && i < 0x0E90))) // FM settings
 			) {
 			EEPROM_WriteBuffer(i, Template);
+		}
+	}
+	if (bIsAll) {
+		RADIO_InitInfo(gRxVfo, FREQ_CHANNEL_FIRST + 5, 5, 41002500);
+		for (i = 0; i < 5; i++) {
+			const uint32_t Frequency = gDefaultFrequencyTable[i];
+
+			gRxVfo->ConfigRX.Frequency = Frequency;
+			gRxVfo->ConfigTX.Frequency = Frequency;
+			gRxVfo->Band = FREQUENCY_GetBand(Frequency);
+			SETTINGS_SaveChannel(MR_CHANNEL_FIRST + i, 0, gRxVfo, 2);
 		}
 	}
 }

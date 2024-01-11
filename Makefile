@@ -1,15 +1,22 @@
 TARGET = firmware
 
-VERSION := 0.001
-
 ENABLE_AIRCOPY := 0
-ENABLE_ALARM := 0
-ENABLE_FMRADIO := 1
-ENABLE_NOAA := 0
+ENABLE_AM_FIX := 1
+ENABLE_FMRADIO := 0
 ENABLE_OVERLAY := 0
+ENABLE_SPECTRUM := 1
 ENABLE_SWD := 0
-ENABLE_TX1750 := 1
+ENABLE_TX1750 := 0
 ENABLE_UART := 1
+ENABLE_NOSCANTIMEOUT := 1
+ENABLE_KEEPNAMEONSAVE := 1
+ENABLE_ALL_REGISTERS := 1
+ENABLE_FASTER_CHANNEL_SCAN := 1
+ENABLE_UART_CAT := 0
+ENABLE_DTMF := 0
+
+SPECTRUM_AUTOMATIC_SQUELCH := 1
+SPECTRUM_EXTRA_VALUES := 1
 
 BSP_DEFINITIONS := $(wildcard hardware/*/*.def)
 BSP_HEADERS := $(patsubst hardware/%,bsp/%,$(BSP_DEFINITIONS))
@@ -51,21 +58,31 @@ OBJS += driver/systick.o
 ifeq ($(ENABLE_UART),1)
 OBJS += driver/uart.o
 endif
+# OBJS += protocols/ook.o
 
 # Main
 OBJS += app/action.o
+ifeq ($(ENABLE_AM_FIX),1)
+OBJS += am_fix.o
+endif
 ifeq ($(ENABLE_AIRCOPY),1)
 OBJS += app/aircopy.o
 endif
 OBJS += app/app.o
 OBJS += app/dtmf.o
+OBJS += app/finput.o
 ifeq ($(ENABLE_FMRADIO),1)
 OBJS += app/fm.o
 endif
 OBJS += app/generic.o
 OBJS += app/main.o
 OBJS += app/menu.o
+OBJS += app/appmenu.o
+OBJS += app/contextmenu.o
 OBJS += app/scanner.o
+ifeq ($(ENABLE_SPECTRUM), 1)
+OBJS += app/spectrum.o
+endif
 ifeq ($(ENABLE_UART),1)
 OBJS += app/uart.o
 endif
@@ -78,6 +95,7 @@ OBJS += frequencies.o
 OBJS += functions.o
 OBJS += helper/battery.o
 OBJS += helper/boot.o
+OBJS += helper/measurements.o
 OBJS += misc.o
 OBJS += radio.o
 OBJS += scheduler.o
@@ -94,27 +112,27 @@ OBJS += ui/inputbox.o
 OBJS += ui/lock.o
 OBJS += ui/main.o
 OBJS += ui/menu.o
+OBJS += ui/appmenu.o
+OBJS += ui/contextmenu.o
 OBJS += ui/rssi.o
 OBJS += ui/scanner.o
 OBJS += ui/status.o
 OBJS += ui/ui.o
 OBJS += ui/welcome.o
+
+OBJS += ui/split.o
+
+OBJS += apps/abscanner.o
+OBJS += apps/scanlist.o
+
 OBJS += version.o
 
 OBJS += main.o
 
-ifeq ($(OS), Windows_NT) # windows
-    TOP := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-    RM = del /Q
-    FixPath = $(subst /,\,$1)
-    WHERE = where
-    NULL_OUTPUT = nul
-else # unix
-    TOP := $(shell pwd)
-    RM = rm -f
-    FixPath = $1
-    WHERE = which
-    NULL_OUTPUT = /dev/null
+ifeq ($(OS),Windows_NT)
+TOP := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+else
+TOP := $(shell pwd)
 endif
 
 AS = arm-none-eabi-gcc
@@ -135,17 +153,17 @@ CFLAGS += -DGIT_HASH=\"$(GIT_HASH)\"
 ifeq ($(ENABLE_AIRCOPY),1)
 CFLAGS += -DENABLE_AIRCOPY
 endif
-ifeq ($(ENABLE_ALARM),1)
-CFLAGS += -DENABLE_ALARM
+ifeq ($(ENABLE_AM_FIX),1)
+	CFLAGS  += -DENABLE_AM_FIX
 endif
 ifeq ($(ENABLE_FMRADIO),1)
 CFLAGS += -DENABLE_FMRADIO
 endif
-ifeq ($(ENABLE_NOAA),1)
-CFLAGS += -DENABLE_NOAA
-endif
 ifeq ($(ENABLE_OVERLAY),1)
 CFLAGS += -DENABLE_OVERLAY
+endif
+ifeq ($(ENABLE_SPECTRUM),1)
+CFLAGS += -DENABLE_SPECTRUM
 endif
 ifeq ($(ENABLE_SWD),1)
 CFLAGS += -DENABLE_SWD
@@ -157,6 +175,27 @@ ifeq ($(ENABLE_UART),1)
 CFLAGS += -DENABLE_UART
 endif
 LDFLAGS = -mcpu=cortex-m0 -nostartfiles -Wl,-T,firmware.ld
+ifeq ($(ENABLE_NOSCANTIMEOUT),1)
+CFLAGS += -DENABLE_NOSCANTIMEOUT
+endif
+ifeq ($(ENABLE_KEEPNAMEONSAVE),1)
+CFLAGS += -DENABLE_KEEPNAMEONSAVE
+endif
+ifeq ($(ENABLE_FASTER_CHANNEL_SCAN),1)
+CFLAGS  += -DENABLE_FASTER_CHANNEL_SCAN
+endif
+ifeq ($(ENABLE_ALL_REGISTERS),1)
+CFLAGS += -DENABLE_ALL_REGISTERS
+endif
+ifeq ($(ENABLE_UART_CAT),1)
+CFLAGS += -DENABLE_UART_CAT
+endif
+ifeq ($(SPECTRUM_AUTOMATIC_SQUELCH),1)
+CFLAGS += -DSPECTRUM_AUTOMATIC_SQUELCH
+endif
+ifeq ($(SPECTRUM_EXTRA_VALUES),1)
+CFLAGS += -DSPECTRUM_EXTRA_VALUES
+endif
 
 ifeq ($(DEBUG),1)
 ASFLAGS += -g
@@ -175,7 +214,7 @@ DEPS = $(OBJS:.o=.d)
 
 all: $(TARGET)
 	$(OBJCOPY) -O binary $< $<.bin
-	-python fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
+	-python3 fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
 	$(SIZE) $<
 
 debug:
@@ -202,6 +241,5 @@ bsp/dp32g030/%.h: hardware/dp32g030/%.def
 -include $(DEPS)
 
 clean:
-	$(RM) $(call FixPath, $(TARGET).bin $(TARGET).packed.bin $(TARGET) $(OBJS) $(DEPS))
-
+	rm -f $(TARGET).bin $(TARGET) $(OBJS) $(DEPS)
 

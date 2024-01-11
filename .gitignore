@@ -1,7 +1,10 @@
 *.o
 *.d
-/compiled-firmware
+firmware
+firmware.bin
+firmware.packed.bin
 link-overlay.S
 sram-overlay
 sram-overlay.bin
-
+__pycache__/
+.vscode/

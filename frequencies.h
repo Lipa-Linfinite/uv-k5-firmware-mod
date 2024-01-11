@@ -17,33 +17,37 @@
 #ifndef FREQUENCIES_H
 #define FREQUENCIES_H
 
-#include <stdint.h>
 #include "radio.h"
+#include <stdint.h>
 
 enum FREQUENCY_Band_t {
-	BAND1_50MHz = 0,
-	BAND2_108MHz,
-	BAND3_136MHz,
-	BAND4_174MHz,
-	BAND5_350MHz,
-	BAND6_400MHz,
-	BAND7_470MHz,
+  BAND1_50MHz,
+  BAND2_108MHz,
+  BAND3_136MHz,
+  BAND4_174MHz,
+  BAND5_350MHz,
+  BAND6_400MHz,
+  BAND7_470MHz,
 };
 
 typedef enum FREQUENCY_Band_t FREQUENCY_Band_t;
 
-extern const uint32_t LowerLimitFrequencyBandTable[7];
-extern const uint32_t MiddleFrequencyBandTable[7];
-extern const uint32_t UpperLimitFrequencyBandTable[7];
-#if defined(ENABLE_NOAA)
-extern const uint32_t NoaaFrequencyTable[10];
-#endif
-extern const uint16_t StepFrequencyTable[7];
+struct FrequencyBandInfo {
+  uint32_t lower;
+  uint32_t upper;
+};
+extern const struct FrequencyBandInfo FrequencyBandTable[7];
+extern const uint16_t StepFrequencyTable[12];
 
 FREQUENCY_Band_t FREQUENCY_GetBand(uint32_t Frequency);
-uint8_t FREQUENCY_CalculateOutputPower(uint8_t TxpLow, uint8_t TxpMid, uint8_t TxpHigh, int32_t LowerLimit, int32_t Middle, int32_t UpperLimit, int32_t Frequency);
+uint8_t FREQUENCY_CalculateOutputPower(uint8_t TxpLow, uint8_t TxpMid,
+                                       uint8_t TxpHigh, int32_t LowerLimit,
+                                       int32_t Middle, int32_t UpperLimit,
+                                       int32_t Frequency);
 uint32_t FREQUENCY_FloorToStep(uint32_t Upper, uint32_t Step, uint32_t Lower);
-int FREQUENCY_Check(VFO_Info_t *pInfo);
+bool IsTXAllowed(uint32_t Frequency);
+bool FREQUENCY_Check(VFO_Info_t *pInfo);
+uint32_t GetScreenF(uint32_t f);
+uint32_t GetTuneF(uint32_t f);
 
 #endif
-

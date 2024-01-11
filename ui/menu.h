@@ -20,6 +20,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define MENU_ITEMS_COUNT 56
+
 enum {
 	MENU_SQL		= 0,
 	MENU_STEP,
@@ -54,9 +56,6 @@ enum {
 	MENU_S_LIST,
 	MENU_SLIST1,
 	MENU_SLIST2,
-#if defined(ENABLE_ALARM)
-	MENU_AL_MOD,
-#endif
 	MENU_ANI_ID,
 	MENU_UPCODE,
 	MENU_DWCODE,
@@ -71,16 +70,14 @@ enum {
 	MENU_ROGER,
 	MENU_VOL,
 	MENU_AM,
-#if defined(ENABLE_NOAA)
-	MENU_NOAA_S,
-#endif
 	MENU_DEL_CH,
 	MENU_RESET,
+	MENU_UPCONVERTER,
 	MENU_350TX,
 	MENU_F_LOCK,
 	MENU_200TX,
 	MENU_500TX,
-	MENU_350EN,
+	MENU_ALL_TX,
 	MENU_SCREN,
 };
 

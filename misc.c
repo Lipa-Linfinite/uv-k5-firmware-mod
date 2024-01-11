@@ -21,10 +21,9 @@ const uint32_t *gUpperLimitFrequencyBandTable;
 const uint32_t *gLowerLimitFrequencyBandTable;
 
 bool gSetting_350TX;
-bool gSetting_KILLED;
 bool gSetting_200TX;
 bool gSetting_500TX;
-bool gSetting_350EN;
+uint8_t gSetting_ALL_TX;
 uint8_t gSetting_F_LOCK;
 bool gSetting_ScrambleEnable;
 
@@ -52,9 +51,6 @@ volatile uint16_t gBatterySaveCountdown = 1000;
 volatile uint16_t gDualWatchCountdown;
 volatile uint16_t gTxTimerCountdown;
 volatile uint16_t gTailNoteEliminationCountdown;
-#if defined(ENABLE_NOAA)
-volatile uint16_t gNOAA_Countdown;
-#endif
 bool gEnableSpeaker;
 uint8_t gKeyLockCountdown;
 uint8_t gRTTECountdown;
@@ -68,7 +64,7 @@ uint8_t gReducedService;
 uint8_t gBatteryVoltageIndex;
 CssScanMode_t gCssScanMode;
 bool gUpdateRSSI;
-#if defined(ENABLE_ALARM) || defined(ENABLE_TX1750)
+#if defined(ENABLE_TX1750)
 AlarmState_t gAlarmState;
 #endif
 uint8_t gVoltageMenuCountdown;
@@ -114,10 +110,6 @@ uint8_t gCurrentScanList;
 uint8_t gPreviousMrChannel;
 uint32_t gRestoreFrequency;
 uint8_t gRxVfoIsActive;
-#if defined(ENABLE_ALARM)
-uint8_t gAlarmToneCounter;
-uint16_t gAlarmRunningCounter;
-#endif
 bool gKeyBeingHeld;
 bool gPttIsPressed;
 uint8_t gPttDebounceCounter;
@@ -130,13 +122,7 @@ uint8_t gAircopySendCountdown;
 uint8_t gFSKWriteIndex;
 uint8_t gNeverUsed;
 
-#if defined(ENABLE_NOAA)
-bool gIsNoaaMode;
-#endif
 volatile bool gNextTimeslice;
-#if defined(ENABLE_NOAA)
-uint8_t gNoaaChannel;
-#endif
 bool gUpdateDisplay;
 bool gF_LOCK;
 uint8_t gShowChPrefix;
@@ -149,9 +135,7 @@ volatile bool gNextTimeslice40ms;
 volatile bool gSchedulePowerSave;
 volatile bool gBatterySaveCountdownExpired;
 volatile bool gScheduleDualWatch = true;
-#if defined(ENABLE_NOAA)
-volatile bool gScheduleNOAA = true;
-#endif
+uint8_t gAbrTxRx;
 volatile bool gFlagTteComplete;
 #if defined(ENABLE_FMRADIO)
 volatile bool gScheduleFM;
@@ -185,10 +169,10 @@ void NUMBER_ToDigits(uint32_t Value, char *pDigits)
 {
 	uint8_t i;
 
-	for (i = 0; i < 8; i++) {
+	for (i = 0; i < 9; i++) {
 		uint32_t Result = Value / 10U;
 
-		pDigits[7 - i] = Value - (Result * 10U);
+		pDigits[8 - i] = Value - (Result * 10U);
 		Value = Result;
 	}
 }
