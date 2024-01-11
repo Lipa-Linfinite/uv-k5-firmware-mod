@@ -22,11 +22,20 @@
 
 #define ARRAY_SIZE(a)    (sizeof(a) / sizeof(a[0]))
 
+#ifndef MAX
+	#define MAX(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
+#endif
+
+#ifndef MIN
+	#define MIN(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
+#endif
+
+#ifndef SWAP
+	#define SWAP(a, b) ({ __typeof__ (a) _c = (a);  a = b; b = _c; })
+#endif
+
 #define IS_MR_CHANNEL(x) ((x) >= MR_CHANNEL_FIRST && (x) <= MR_CHANNEL_LAST)
 #define IS_FREQ_CHANNEL(x) ((x) >= FREQ_CHANNEL_FIRST && (x) <= FREQ_CHANNEL_LAST)
-#if defined(ENABLE_NOAA)
-#define IS_NOAA_CHANNEL(x) ((x) >= NOAA_CHANNEL_FIRST && (x) <= NOAA_CHANNEL_LAST)
-#endif
 #define IS_NOT_NOAA_CHANNEL(x) ((x) >= MR_CHANNEL_FIRST && (x) <= FREQ_CHANNEL_LAST)
 #define IS_VALID_CHANNEL(x) ((x) < LAST_CHANNEL)
 
@@ -35,10 +44,6 @@ enum {
 	MR_CHANNEL_LAST = 199U,
 	FREQ_CHANNEL_FIRST = 200U,
 	FREQ_CHANNEL_LAST = 206U,
-#if defined(ENABLE_NOAA)
-	NOAA_CHANNEL_FIRST = 207U,
-	NOAA_CHANNEL_LAST = 216U,
-#endif
 	LAST_CHANNEL,
 };
 
@@ -46,11 +51,14 @@ enum {
 	FLASHLIGHT_OFF = 0U,
 	FLASHLIGHT_ON = 1U,
 	FLASHLIGHT_BLINK = 2U,
+#ifdef ENABLE_FLASHLIGHT_SOS
+	FLASHLIGHT_SOS = 3U
+#endif
 };
 
 enum {
-	VFO_CONFIGURE_NONE = 0U,
-	VFO_CONFIGURE = 1U,
+	VFO_CONFIGURE_0 = 0U,
+	VFO_CONFIGURE_1 = 1U,
 	VFO_CONFIGURE_RELOAD = 2U,
 };
 
@@ -79,14 +87,10 @@ enum CssScanMode_t {
 
 typedef enum CssScanMode_t CssScanMode_t;
 
-extern const uint32_t *gUpperLimitFrequencyBandTable;
-extern const uint32_t *gLowerLimitFrequencyBandTable;
-
 extern bool gSetting_350TX;
-extern bool gSetting_KILLED;
 extern bool gSetting_200TX;
 extern bool gSetting_500TX;
-extern bool gSetting_350EN;
+extern uint8_t gSetting_ALL_TX;
 extern uint8_t gSetting_F_LOCK;
 extern bool gSetting_ScrambleEnable;
 extern uint8_t gSetting_F_LOCK;
@@ -110,9 +114,6 @@ extern volatile uint16_t gDualWatchCountdown;
 extern volatile uint16_t gTxTimerCountdown;
 extern volatile uint16_t gTailNoteEliminationCountdown;
 extern volatile uint16_t gFmPlayCountdown;
-#if defined(ENABLE_NOAA)
-extern volatile uint16_t gNOAA_Countdown;
-#endif
 extern bool gEnableSpeaker;
 extern uint8_t gKeyLockCountdown;
 extern uint8_t gRTTECountdown;
@@ -170,10 +171,6 @@ extern uint8_t gCurrentScanList;
 extern uint8_t gPreviousMrChannel;
 extern uint32_t gRestoreFrequency;
 extern uint8_t gRxVfoIsActive;
-#if defined(ENABLE_ALARM)
-extern uint8_t gAlarmToneCounter;
-extern uint16_t gAlarmRunningCounter;
-#endif
 extern bool gKeyBeingHeld;
 extern bool gPttIsPressed;
 extern uint8_t gPttDebounceCounter;
@@ -186,13 +183,7 @@ extern uint8_t gAircopySendCountdown;
 extern uint8_t gFSKWriteIndex;
 extern uint8_t gNeverUsed;
 
-#if defined(ENABLE_NOAA)
-extern bool gIsNoaaMode;
-#endif
 extern volatile bool gNextTimeslice;
-#if defined(ENABLE_NOAA)
-extern uint8_t gNoaaChannel;
-#endif
 extern bool gUpdateDisplay;
 extern bool gF_LOCK;
 extern uint8_t gShowChPrefix;
@@ -205,9 +196,6 @@ extern volatile bool gNextTimeslice40ms;
 extern volatile bool gSchedulePowerSave;
 extern volatile bool gBatterySaveCountdownExpired;
 extern volatile bool gScheduleDualWatch;
-#if defined(ENABLE_NOAA)
-extern volatile bool gScheduleNOAA;
-#endif
 extern volatile bool gFlagTteComplete;
 #if defined(ENABLE_FMRADIO)
 extern volatile bool gScheduleFM;

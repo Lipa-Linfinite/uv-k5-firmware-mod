@@ -15,7 +15,7 @@
  */
 
 #include "bsp/dp32g030/gpio.h"
-#include "driver/bk1080.h"
+#include "bk1080.h"
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "driver/system.h"
@@ -38,11 +38,11 @@ static bool gIsInitBK1080;
 uint16_t BK1080_BaseFrequency;
 uint16_t BK1080_FrequencyDeviation;
 
-void BK1080_Init(uint16_t Frequency, bool bEnable)
+void BK1080_Init(uint16_t Frequency, bool bDoScan)
 {
 	uint8_t i;
 
-	if (bEnable) {
+	if (bDoScan) {
 		GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_BK1080);
 
 		if (!gIsInitBK1080) {

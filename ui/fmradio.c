@@ -15,15 +15,15 @@
  */
 
 #include <string.h>
-#include "app/fm.h"
-#include "driver/st7565.h"
-#include "external/printf/printf.h"
-#include "misc.h"
-#include "settings.h"
-#include "ui/fmradio.h"
-#include "ui/helper.h"
-#include "ui/inputbox.h"
-#include "ui/ui.h"
+#include "../app/fm.h"
+#include "../driver/st7565.h"
+#include "../external/printf/printf.h"
+#include "../misc.h"
+#include "../settings.h"
+#include "fmradio.h"
+#include "helper.h"
+#include "inputbox.h"
+#include "ui.h"
 
 void UI_DisplayFM(void)
 {
@@ -74,9 +74,9 @@ void UI_DisplayFM(void)
 	} else if (!gAskToDelete) {
 		if (gInputBoxIndex == 0) {
 			NUMBER_ToDigits(gEeprom.FM_FrequencyPlaying * 10000, String);
-			UI_DisplayFrequency(String, 23, 4, false, true);
+			UI_DisplayFrequency(String, 15, 4, false, true);
 		} else {
-			UI_DisplayFrequency(gInputBox, 23, 4, true, false);
+			UI_DisplayFrequency(gInputBox, 15, 4, true, false);
 		}
 		ST7565_BlitFullScreen();
 		return;

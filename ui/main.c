@@ -1,5 +1,6 @@
-/* Copyright 2023 Dual Tachyon
+/* Copyright 2023 Dual Tachyon, fagci
  * https://github.com/DualTachyon
+ * https://github.com/fagci
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,367 +15,298 @@
  *     limitations under the License.
  */
 
+#include "../ui/main.h"
+#include "../app/dtmf.h"
+#include "../app/finput.h"
+#include "../bitmaps.h"
+#include "../driver/bk4819.h"
+#include "../driver/st7565.h"
+#include "../external/printf/printf.h"
+#include "../frequencies.h"
+#include "../functions.h"
+#include "../helper/measurements.h"
+#include "../misc.h"
+#include "../radio.h"
+#include "../settings.h"
+#include "../ui/helper.h"
+#include "../ui/inputbox.h"
+#include "../ui/rssi.h"
+#include "../ui/ui.h"
+#ifdef ENABLE_LIVESEEK_MHZ_KEYPAD
+#include "app/ceccommon.h"
+#endif
 #include <string.h>
-#include "app/dtmf.h"
-#include "bitmaps.h"
-#include "driver/st7565.h"
-#include "external/printf/printf.h"
-#include "functions.h"
-#include "misc.h"
-#include "radio.h"
-#include "settings.h"
-#include "ui/helper.h"
-#include "ui/inputbox.h"
-#include "ui/main.h"
 
-enum {
-	LEVEL_MODE_OFF = 0,
-	LEVEL_MODE_TX,
-	LEVEL_MODE_RSSI,
-};
+void UI_DisplayMain(void) {
+  char String[16];
+  uint8_t i;
 
-void UI_DisplayMain(void)
-{
-	char String[16];
-	uint8_t i;
+  memset(gFrameBuffer, 0, sizeof(gFrameBuffer));
+  if (gEeprom.KEY_LOCK && gKeypadLocked) {
+    UI_PrintString("Long Press #", 0, 127, 1, 8, true);
+    UI_PrintString("To Unlock", 0, 127, 3, 8, true);
+    ST7565_BlitFullScreen();
+    return;
+  }
 
-	memset(gFrameBuffer, 0, sizeof(gFrameBuffer));
-	if (gEeprom.KEY_LOCK && gKeypadLocked) {
-		UI_PrintString("Long Press #", 0, 127, 1, 8, true);
-		UI_PrintString("To Unlock", 0, 127, 3, 8, true);
-		ST7565_BlitFullScreen();
-		return;
-	}
+  for (i = 0; i < 2; i++) {
+    bool filled = false;
+    uint8_t Line = i * 4;
+    uint8_t lineSubY = (Line + 2) * 8;
 
-	for (i = 0; i < 2; i++) {
-		uint8_t *pLine0;
-		uint8_t *pLine1;
-		uint8_t Line;
-		uint8_t Channel;
-		bool bIsSameVfo;
+    uint8_t Channel = gEeprom.TX_CHANNEL;
+    bool bIsSameVfo = !!(Channel == i);
+    VFO_Info_t vfoInfo = gEeprom.VfoInfo[i];
+    uint8_t screenCH = gEeprom.ScreenChannel[i];
+    uint8_t *pLine0 = gFrameBuffer[Line];
 
-		if (i == 0) {
-			pLine0 = gFrameBuffer[0];
-			pLine1 = gFrameBuffer[1];
-			Line = 0;
-		} else {
-			pLine0 = gFrameBuffer[4];
-			pLine1 = gFrameBuffer[5];
-			Line = 4;
-		}
+    if (gEeprom.DUAL_WATCH != DUAL_WATCH_OFF && gRxVfoIsActive) {
+      Channel = gEeprom.RX_CHANNEL;
+    }
 
-		Channel = gEeprom.TX_VFO;
-		bIsSameVfo = !!(Channel == i);
+    if (Channel != i) {
+#ifdef ENABLE_DTMF_CALLING
+		
+      if (gDTMF_CallState != DTMF_CALL_STATE_NONE || gDTMF_IsTx ||
+          gDTMF_InputMode) {
+        char Contact[16];
 
-		if (gEeprom.DUAL_WATCH != DUAL_WATCH_OFF && gRxVfoIsActive) {
-			Channel = gEeprom.RX_VFO;
-		}
+        if (!gDTMF_InputMode) {
+          if (gDTMF_CallState == DTMF_CALL_STATE_CALL_OUT) {
+            if (gDTMF_State == DTMF_STATE_CALL_OUT_RSP) {
+              strcpy(String, "CALL OUT(RSP)");
+            } else {
+              strcpy(String, "CALL OUT");
+            }
+          } else if (gDTMF_CallState == DTMF_CALL_STATE_RECEIVED) {
+            if (DTMF_FindContact(gDTMF_Caller, Contact)) {
+              sprintf(String, "CALL:%s", Contact);
+            } else {
+              sprintf(String, "CALL:%s", gDTMF_Caller);
+            }
+          } else if (gDTMF_IsTx) {
+            if (gDTMF_State == DTMF_STATE_TX_SUCC) {
+              strcpy(String, "DTMF TX(SUCC)");
+            } else {
+              strcpy(String, "DTMF TX");
+            }
+          }
+        } else {
+          sprintf(String, ">%s", gDTMF_InputBox);
+        }
+        UI_PrintString(String, 2, 127, i * 3, 8, false);
 
-		if (Channel != i) {
-			if (gDTMF_CallState != DTMF_CALL_STATE_NONE || gDTMF_IsTx || gDTMF_InputMode) {
-				char Contact[16];
+        memset(String, 0, sizeof(String));
+        memset(Contact, 0, sizeof(Contact));
 
-				if (!gDTMF_InputMode) {
-					if (gDTMF_CallState == DTMF_CALL_STATE_CALL_OUT) {
-						if (gDTMF_State == DTMF_STATE_CALL_OUT_RSP) {
-							strcpy(String, "CALL OUT(RSP)");
-						} else {
-							strcpy(String, "CALL OUT");
-						}
-					} else if (gDTMF_CallState == DTMF_CALL_STATE_RECEIVED) {
-						if (DTMF_FindContact(gDTMF_Caller, Contact)) {
-							sprintf(String, "CALL:%s", Contact);
-						} else {
-							sprintf(String, "CALL:%s", gDTMF_Caller);
-						}
-					} else if (gDTMF_IsTx) {
-						if (gDTMF_State == DTMF_STATE_TX_SUCC) {
-							strcpy(String, "DTMF TX(SUCC)");
-						} else {
-							strcpy(String, "DTMF TX");
-						}
-					}
-				} else {
-					sprintf(String, ">%s", gDTMF_InputBox);
-				}
-				UI_PrintString(String, 2, 127, i * 3, 8, false);
-
-				memset(String, 0, sizeof(String));
-				memset(Contact, 0, sizeof(Contact));
-
-				if (!gDTMF_InputMode) {
-					if (gDTMF_CallState == DTMF_CALL_STATE_CALL_OUT) {
-						if (DTMF_FindContact(gDTMF_String, Contact)) {
-							sprintf(String, ">%s", Contact);
-						} else {
-							sprintf(String, ">%s", gDTMF_String);
-						}
-					} else if (gDTMF_CallState == DTMF_CALL_STATE_RECEIVED) {
-						if (DTMF_FindContact(gDTMF_Callee, Contact)) {
-							sprintf(String, ">%s", Contact);
-						} else {
-							sprintf(String, ">%s", gDTMF_Callee);
-						}
-					} else if (gDTMF_IsTx) {
-						sprintf(String, ">%s", gDTMF_String);
-					}
-				}
-				UI_PrintString(String, 2, 127, 2 + (i * 3), 8, false);
-				continue;
-			} else if (bIsSameVfo) {
-				memcpy(pLine0 + 2, BITMAP_VFO_Default, sizeof(BITMAP_VFO_Default));
-			}
-		} else {
-			if (bIsSameVfo) {
-				memcpy(pLine0 + 2, BITMAP_VFO_Default, sizeof(BITMAP_VFO_Default));
-			} else {
-				memcpy(pLine0 + 2, BITMAP_VFO_NotDefault, sizeof(BITMAP_VFO_NotDefault));
-			}
-		}
-
-		// 0x8EE2
-		uint32_t LevelMode = LEVEL_MODE_OFF;
-
-		if (gCurrentFunction == FUNCTION_TRANSMIT) {
-#if defined(ENABLE_ALARM)
-			if (gAlarmState == ALARM_STATE_ALARM) {
-				LevelMode = LEVEL_MODE_RSSI;
-			} else {
+        if (!gDTMF_InputMode) {
+          if (gDTMF_CallState == DTMF_CALL_STATE_CALL_OUT) {
+            if (DTMF_FindContact(gDTMF_String, Contact)) {
+              sprintf(String, ">%s", Contact);
+            } else {
+              sprintf(String, ">%s", gDTMF_String);
+            }
+          } else if (gDTMF_CallState == DTMF_CALL_STATE_RECEIVED) {
+            if (DTMF_FindContact(gDTMF_Callee, Contact)) {
+              sprintf(String, ">%s", Contact);
+            } else {
+              sprintf(String, ">%s", gDTMF_Callee);
+            }
+          } else if (gDTMF_IsTx) {
+            sprintf(String, ">%s", gDTMF_String);
+          }
+        }
+        UI_PrintString(String, 2, 127, 2 + (i * 3), 8, false);
+        continue;
+      }
+	  else if (bIsSameVfo) {
+        // Default
+        filled = true;
+        memset(pLine0, 127, 19);
+      }
 #else
-			if (1) {
+	if (bIsSameVfo) {
+        // Default
+        filled = true;
+        memset(pLine0, 127, 19);
+      }
+#endif	  
+    } else {
+      if (bIsSameVfo) {
+        // Default
+        filled = true;
+        memset(pLine0, 127, 19);
+      } else {
+        // Not default
+        pLine0[0] = 0b01111111;
+        pLine0[1] = 0b01000001;
+        pLine0[17] = 0b01000001;
+        pLine0[18] = 0b01111111;
+      }
+    }
+
+    // 0x8EE2
+    uint32_t SomeValue = 0;
+
+    if (gCurrentFunction == FUNCTION_TRANSMIT) {
+      if (gEeprom.CROSS_BAND_RX_TX == CROSS_BAND_OFF) {
+        Channel = gEeprom.RX_CHANNEL;
+      } else {
+        Channel = gEeprom.TX_CHANNEL;
+      }
+      if (Channel == i) {
+        SomeValue = 1;
+        UI_PrintStringSmallBold("TX", 0, 0, Line + 1);
+      }
+    } else {
+      SomeValue = 2;
+      if ((gCurrentFunction == FUNCTION_RECEIVE ||
+           gCurrentFunction == FUNCTION_MONITOR) &&
+          gEeprom.RX_CHANNEL == i) {
+        UI_PrintStringSmallBold("RX", 0, 0, Line + 1);
+      }
+    }
+
+    if (IS_MR_CHANNEL(screenCH)) {
+      if (gInputBoxIndex == 0 || gEeprom.TX_CHANNEL != i) {
+        sprintf(String, "M%03d", screenCH + 1);
+      } else {
+        sprintf(String, "M---");
+        // TODO: temporary
+        for (uint8_t j = 0; j < 3; j++) {
+          char v = gInputBox[j];
+          String[j + 1] = v == 10 ? '-' : v + '0';
+        }
+      }
+      UI_PrintStringSmallest(String, 2, Line * 8 + 1, false, !filled);
+    } else {
+      UI_PrintStringSmallest("VFO", 4, Line * 8 + 1, false, !filled);
+    }
+
+    uint8_t State = VfoState[i];
+    if (State) {
+      uint8_t Width = 10;
+
+      strcpy(String, vfoStateNames[State]);
+
+      if (State == VFO_STATE_BUSY) {
+        Width = 15;
+      } else if (State == VFO_STATE_VOL_HIGH) {
+        Width = 8;
+      }
+
+      UI_PrintString(String, 31, 111, i * 4, Width, true);
+    } else {
+      if (freqInputIndex && IS_FREQ_CHANNEL(screenCH) &&
+          gEeprom.TX_CHANNEL == i) {
+        UI_PrintString(freqInputString, 24, 127, i * 4, 8, true);
+      } else {
+        uint32_t frequency = vfoInfo.pRX->Frequency;
+        bool noChannelName = vfoInfo.Name[0] == 0 || vfoInfo.Name[0] == 255;
+
+        if (gCurrentFunction == FUNCTION_TRANSMIT) {
+          if (gEeprom.CROSS_BAND_RX_TX == CROSS_BAND_OFF) {
+            Channel = gEeprom.RX_CHANNEL;
+          } else {
+            Channel = gEeprom.TX_CHANNEL;
+          }
+          if (Channel == i) {
+            frequency = vfoInfo.pTX->Frequency;
+          }
+        }
+
+        if (IS_MR_CHANNEL(screenCH)) {
+          const uint8_t ATTR = gMR_ChannelAttributes[screenCH];
+          if (ATTR & MR_CH_SCANLIST1) {
+                        gFrameBuffer[Line+2][116] = 0b00001111;
+                        gFrameBuffer[Line+2][117] = 0b00001111;
+                        gFrameBuffer[Line+2][118] = 0b00001111;
+                        gFrameBuffer[Line+2][119] = 0b00001111;
+                        gFrameBuffer[Line+2][120] = 0b00001111;
+            // UI_PrintStringSmallest("s1", 112, lineSubY, false, true);
+          }
+          if (ATTR & MR_CH_SCANLIST2) {
+                        gFrameBuffer[Line+2][122] = 0b00001111;
+                        gFrameBuffer[Line+2][123] = 0b00001111;
+                        gFrameBuffer[Line+2][124] = 0b00001111;
+                        gFrameBuffer[Line+2][125] = 0b00001111;
+                        gFrameBuffer[Line+2][126] = 0b00001111;
+            // UI_PrintStringSmallest("s2", 120, lineSubY, false, true);
+          }
+        }
+
+        sprintf(String, "CH-%03u", screenCH + 1);
+
+		frequency = GetScreenF(frequency);
+
+        if (!IS_MR_CHANNEL(screenCH) ||
+            gEeprom.CHANNEL_DISPLAY_MODE == MDF_FREQUENCY) {
+          NUMBER_ToDigits(frequency, String);
+          UI_DisplayFrequency(String, 19, Line, false, false);
+          UI_DisplaySmallDigits(2, String + 7, 113, Line + 1);
+        } else if (gEeprom.CHANNEL_DISPLAY_MODE == MDF_CHANNEL ||
+                   (gEeprom.CHANNEL_DISPLAY_MODE == MDF_NAME &&
+                    noChannelName)) {
+          UI_PrintString(String, 31, 112, i * 4, 8, true);
+        } else if (gEeprom.CHANNEL_DISPLAY_MODE == MDF_NAME_FREQ) {
+          // no channel name, show channel number instead
+          if (!noChannelName) {
+            memset(String, 0, sizeof(String));
+            memmove(String, vfoInfo.Name, 10);
+          }
+          UI_PrintStringSmallBold(String, 31 + 8, 0, Line);
+
+          // show the channel frequency below the channel number/name
+          sprintf(String, "%u.%05u", (unsigned int) frequency / 100000, (unsigned int) frequency % 100000);
+          UI_PrintStringSmall(String, 31 + 8, 0, Line + 1);
+        } else {
+          UI_PrintString(vfoInfo.Name, 31, 112, i * 4, 8, true);
+        }
+      }
+    }
+
+    if (vfoInfo.ModulationType == MOD_FM) {
+      const FREQ_Config_t *pConfig = SomeValue == 1 ? vfoInfo.pTX : vfoInfo.pRX;
+
+      UI_PrintStringSmallest(dcsNames[pConfig->CodeType], 21, lineSubY, false,
+                             true);
+    }
+    UI_PrintStringSmallest(modulationTypeOptions[vfoInfo.ModulationType], 116,
+                           2 + i * 32, false, true);
+
+    UI_PrintStringSmallest(powerNames[vfoInfo.OUTPUT_POWER], 35, lineSubY,
+                           false, true);
+
+    UI_PrintStringSmallest(deviationNames[vfoInfo.FREQUENCY_DEVIATION_SETTING],
+                           54, lineSubY, false, true);
+
+    if (vfoInfo.FrequencyReverse) {
+      UI_PrintStringSmallest("R", 64, lineSubY, false, true);
+    }
+    UI_PrintStringSmallest(bwNames[vfoInfo.CHANNEL_BANDWIDTH], 60, lineSubY,
+                           false, true);
+    if (vfoInfo.DTMF_DECODING_ENABLE) {
+      UI_PrintStringSmallest("DTMF", 81, lineSubY, false, true);
+    }
+    if (vfoInfo.SCRAMBLING_TYPE && gSetting_ScrambleEnable) {
+      UI_PrintStringSmallest("SCR", 98, lineSubY, false, true);
+    }
+  }
+
+  if (gScreenToDisplay == DISPLAY_MAIN && !gKeypadLocked && !gAppToDisplay && !gAppToDisplay) {
+    if (gCurrentFunction == FUNCTION_RECEIVE ||
+        gCurrentFunction == FUNCTION_MONITOR ||
+        gCurrentFunction == FUNCTION_INCOMING /*|| GPIO_CheckBit(&GPIOB->DATA, GPIOB_PIN_BACKLIGHT)*/) {
+#ifdef ENABLE_MIC_PLUS_GAIN_BAR_TX
+		UI_DisplayRSSIBar(BK4819_GetRSSI());
+    } else if (gCurrentFunction == FUNCTION_TRANSMIT) { UI_DisplayMICBar(); }
+	#else	
+		}
+#endif	  
+    }
+#ifdef ENABLE_LIVESEEK_MHZ_KEYPAD
+	if (CommBuffUsingType == COMBUFF_USE_SEEK_RSSI)
+		DrawCommBuffToSpectrum();
 #endif
-				if (gEeprom.CROSS_BAND_RX_TX == CROSS_BAND_OFF) {
-					Channel = gEeprom.RX_VFO;
-				} else {
-					Channel = gEeprom.TX_VFO;
-				}
-				if (Channel == i) {
-					LevelMode = LEVEL_MODE_TX;
-					memcpy(pLine0 + 14, BITMAP_TX, sizeof(BITMAP_TX));
-				}
-			}
-		} else {
-			LevelMode = LEVEL_MODE_RSSI;
-			if ((gCurrentFunction == FUNCTION_RECEIVE || gCurrentFunction == FUNCTION_MONITOR) && gEeprom.RX_VFO == i) {
-				memcpy(pLine0 + 14, BITMAP_RX, sizeof(BITMAP_RX));
-			}
-		}
-
-		// 0x8F3C
-		if (IS_MR_CHANNEL(gEeprom.ScreenChannel[i])) {
-			memcpy(pLine1 + 2, BITMAP_M, sizeof(BITMAP_M));
-			if (gInputBoxIndex == 0 || gEeprom.TX_VFO != i) {
-				NUMBER_ToDigits(gEeprom.ScreenChannel[i] + 1, String);
-			} else {
-				memcpy(String + 5, gInputBox, 3);
-			}
-			UI_DisplaySmallDigits(3, String + 5, 10, Line + 1);
-		} else if (IS_FREQ_CHANNEL(gEeprom.ScreenChannel[i])) {
-			char c;
-
-			memcpy(pLine1 + 14, BITMAP_F, sizeof(BITMAP_F));
-			c = (gEeprom.ScreenChannel[i] - FREQ_CHANNEL_FIRST) + 1;
-			UI_DisplaySmallDigits(1, &c, 22, Line + 1);
-		} else {
-#if defined(ENABLE_NOAA)
-			memcpy(pLine1 + 7, BITMAP_NarrowBand, sizeof(BITMAP_NarrowBand));
-			if (gInputBoxIndex == 0 || gEeprom.TX_VFO != i) {
-				NUMBER_ToDigits((gEeprom.ScreenChannel[i] - NOAA_CHANNEL_FIRST) + 1, String);
-			} else {
-				String[6] = gInputBox[0];
-				String[7] = gInputBox[1];
-			}
-			UI_DisplaySmallDigits(2, String + 6, 15, Line + 1);
-#endif
-		}
-
-		// 0x8FEC
-
-		uint8_t State = VfoState[i];
-#if defined(ENABLE_ALARM)
-		if (gCurrentFunction == FUNCTION_TRANSMIT && gAlarmState == ALARM_STATE_ALARM) {
-			if (gEeprom.CROSS_BAND_RX_TX == CROSS_BAND_OFF) {
-				Channel = gEeprom.RX_VFO;
-			} else {
-				Channel = gEeprom.TX_VFO;
-			}
-			if (Channel == i) {
-				State = VFO_STATE_ALARM;
-			}
-		}
-#endif
-		if (State) {
-			uint8_t Width = 10;
-
-			memset(String, 0, sizeof(String));
-			switch (State) {
-			case 1:
-				strcpy(String, "BUSY");
-				Width = 15;
-				break;
-			case 2:
-				strcpy(String, "BAT LOW");
-				break;
-			case 3:
-				strcpy(String, "DISABLE");
-				break;
-			case 4:
-				strcpy(String, "TIMEOUT");
-				break;
-#if defined(ENABLE_ALARM)
-			case 5:
-				strcpy(String, "ALARM");
-				break;
-#endif
-			case 6:
-				sprintf(String, "VOL HIGH");
-				Width = 8;
-				break;
-			}
-			UI_PrintString(String, 31, 111, i * 4, Width, true);
-		} else {
-			if (gInputBoxIndex && IS_FREQ_CHANNEL(gEeprom.ScreenChannel[i]) && gEeprom.TX_VFO == i) {
-				UI_DisplayFrequency(gInputBox, 31, i * 4, true, false);
-			} else {
-				if (!IS_MR_CHANNEL(gEeprom.ScreenChannel[i]) || gEeprom.CHANNEL_DISPLAY_MODE == MDF_FREQUENCY) {
-					if (gCurrentFunction == FUNCTION_TRANSMIT) {
-						if (gEeprom.CROSS_BAND_RX_TX == CROSS_BAND_OFF) {
-							Channel = gEeprom.RX_VFO;
-						} else {
-							Channel = gEeprom.TX_VFO;
-						}
-						if (Channel == i) {
-							NUMBER_ToDigits(gEeprom.VfoInfo[i].pTX->Frequency, String);
-						} else {
-							NUMBER_ToDigits(gEeprom.VfoInfo[i].pRX->Frequency, String);
-						}
-					} else {
-						NUMBER_ToDigits(gEeprom.VfoInfo[i].pRX->Frequency, String);
-					}
-					UI_DisplayFrequency(String, 31, i * 4, false, false);
-					if (IS_MR_CHANNEL(gEeprom.ScreenChannel[i])) {
-						const uint8_t Attributes = gMR_ChannelAttributes[gEeprom.ScreenChannel[i]];
-						if (Attributes & MR_CH_SCANLIST1) {
-							memcpy(pLine0 + 113, BITMAP_ScanList, sizeof(BITMAP_ScanList));
-						}
-						if (Attributes & MR_CH_SCANLIST2) {
-							memcpy(pLine0 + 120, BITMAP_ScanList, sizeof(BITMAP_ScanList));
-						}
-					}
-					UI_DisplaySmallDigits(2, String + 6, 112, Line + 1);
-				} else if (gEeprom.CHANNEL_DISPLAY_MODE == MDF_CHANNEL) {
-					sprintf(String, "CH-%03d", gEeprom.ScreenChannel[i] + 1);
-					UI_PrintString(String, 31, 112, i * 4, 8, true);
-				} else if (gEeprom.CHANNEL_DISPLAY_MODE == MDF_NAME) {
-					if(gEeprom.VfoInfo[i].Name[0] == 0 || gEeprom.VfoInfo[i].Name[0] == 0xFF) {
-						sprintf(String, "CH-%03d", gEeprom.ScreenChannel[i] + 1);
-						UI_PrintString(String, 31, 112, i * 4, 8, true);
-					} else {
-						UI_PrintString(gEeprom.VfoInfo[i].Name, 31, 112, i * 4, 8, true);
-					}
-				}
-			}
-		}
-
-		// 0x926E
-		uint8_t Level = 0;
-
-		if (LevelMode == LEVEL_MODE_TX) {
-			if (gRxVfo->OUTPUT_POWER == OUTPUT_POWER_LOW) {
-				Level = 2;
-			} else if (gRxVfo->OUTPUT_POWER == OUTPUT_POWER_MID) {
-				Level = 4;
-			} else {
-				Level = 6;
-			}
-		} else if (LevelMode == LEVEL_MODE_RSSI) {
-			if (gVFO_RSSI_Level[i]) {
-				Level = gVFO_RSSI_Level[i];
-			}
-		}
-
-		// TODO: not quite how the original does it, but it's quite entangled in Ghidra.
-		if (Level) {
-			memcpy(pLine1 + 128 + 0, BITMAP_Antenna, sizeof(BITMAP_Antenna));
-			memcpy(pLine1 + 128 + 5, BITMAP_AntennaLevel1, sizeof(BITMAP_AntennaLevel1));
-			if (Level >= 2) {
-				memcpy(pLine1 + 128 + 8, BITMAP_AntennaLevel2, sizeof(BITMAP_AntennaLevel2));
-			}
-			if (Level >= 3) {
-				memcpy(pLine1 + 128 + 11, BITMAP_AntennaLevel3, sizeof(BITMAP_AntennaLevel3));
-			}
-			if (Level >= 4) {
-				memcpy(pLine1 + 128 + 14, BITMAP_AntennaLevel4, sizeof(BITMAP_AntennaLevel4));
-			}
-			if (Level >= 5) {
-				memcpy(pLine1 + 128 + 17, BITMAP_AntennaLevel5, sizeof(BITMAP_AntennaLevel5));
-			}
-			if (Level >= 6) {
-				memcpy(pLine1 + 128 + 20, BITMAP_AntennaLevel6, sizeof(BITMAP_AntennaLevel6));
-			}
-		}
-
-		// 0x931E
-		if (gEeprom.VfoInfo[i].IsAM) {
-			memcpy(pLine1 + 128 + 27, BITMAP_AM, sizeof(BITMAP_AM));
-		} else {
-			const FREQ_Config_t *pConfig;
-
-			if (LevelMode == LEVEL_MODE_TX) {
-				pConfig = gEeprom.VfoInfo[i].pTX;
-			} else {
-				pConfig = gEeprom.VfoInfo[i].pRX;
-			}
-			switch (pConfig->CodeType) {
-			case CODE_TYPE_CONTINUOUS_TONE:
-				memcpy(pLine1 + 128 + 27, BITMAP_CT, sizeof(BITMAP_CT));
-				break;
-			case CODE_TYPE_DIGITAL:
-			case CODE_TYPE_REVERSE_DIGITAL:
-				memcpy(pLine1 + 128 + 24, BITMAP_DCS, sizeof(BITMAP_DCS));
-				break;
-			default:
-				break;
-			}
-		}
-
-		// 0x936C
-		switch (gEeprom.VfoInfo[i].OUTPUT_POWER) {
-		case OUTPUT_POWER_LOW:
-			memcpy(pLine1 + 128 + 44, BITMAP_PowerLow, sizeof(BITMAP_PowerLow));
-			break;
-		case OUTPUT_POWER_MID:
-			memcpy(pLine1 + 128 + 44, BITMAP_PowerMid, sizeof(BITMAP_PowerMid));
-			break;
-		case OUTPUT_POWER_HIGH:
-			memcpy(pLine1 + 128 + 44, BITMAP_PowerHigh, sizeof(BITMAP_PowerHigh));
-			break;
-		}
-
-		if (gEeprom.VfoInfo[i].ConfigRX.Frequency != gEeprom.VfoInfo[i].ConfigTX.Frequency) {
-			if (gEeprom.VfoInfo[i].FREQUENCY_DEVIATION_SETTING == FREQUENCY_DEVIATION_ADD) {
-				memcpy(pLine1 + 128 + 54, BITMAP_Add, sizeof(BITMAP_Add));
-			}
-			if (gEeprom.VfoInfo[i].FREQUENCY_DEVIATION_SETTING == FREQUENCY_DEVIATION_SUB) {
-				memcpy(pLine1 + 128 + 54, BITMAP_Sub, sizeof(BITMAP_Sub));
-			}
-
-		}
-
-		if (gEeprom.VfoInfo[i].FrequencyReverse) {
-			memcpy(pLine1 + 128 + 64, BITMAP_ReverseMode, sizeof(BITMAP_ReverseMode));
-		}
-		if (gEeprom.VfoInfo[i].CHANNEL_BANDWIDTH == BANDWIDTH_NARROW) {
-			memcpy(pLine1 + 128 + 74, BITMAP_NarrowBand, sizeof(BITMAP_NarrowBand));
-		}
-		if (gEeprom.VfoInfo[i].DTMF_DECODING_ENABLE || gSetting_KILLED) {
-			memcpy(pLine1 + 128 + 84, BITMAP_DTMF, sizeof(BITMAP_DTMF));
-		}
-		if (gEeprom.VfoInfo[i].SCRAMBLING_TYPE && gSetting_ScrambleEnable) {
-			memcpy(pLine1 + 128 + 110, BITMAP_Scramble, sizeof(BITMAP_Scramble));
-		}
-	}
-
-	ST7565_BlitFullScreen();
+  ST7565_BlitFullScreen();
 }
-

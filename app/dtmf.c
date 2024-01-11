@@ -13,6 +13,7 @@
  *     See the License for the specific language governing permissions and
  *     limitations under the License.
  */
+//#ifdef ENABLE_DTMF_CALLING
 
 #include <string.h>
 #if defined(ENABLE_FMRADIO)
@@ -54,6 +55,7 @@ bool gDTMF_IsTx;
 uint8_t gDTMF_TxStopCountdown;
 bool gDTMF_IsGroupCall;
 
+#ifdef ENABLE_DTMF_CALLING
 bool DTMF_ValidateCodes(char *pCode, uint8_t Size)
 {
 	uint8_t i;
@@ -149,7 +151,7 @@ bool DTMF_CompareMessage(const char *pMsg, const char *pTemplate, uint8_t Size, 
 	return true;
 }
 
-DTMF_CallMode_t DTMF_CheckGroupCall(const char *pMsg, uint32_t Size)
+bool DTMF_CheckGroupCall(const char *pMsg, uint32_t Size)
 {
 	uint32_t i;
 
@@ -159,10 +161,10 @@ DTMF_CallMode_t DTMF_CheckGroupCall(const char *pMsg, uint32_t Size)
 		}
 	}
 	if (i != Size) {
-		return DTMF_CALL_MODE_GROUP;
+		return true;
 	}
 
-	return DTMF_CALL_MODE_NOT_GROUP;
+	return false;
 }
 
 void DTMF_Append(char Code)
@@ -191,42 +193,9 @@ void DTMF_HandleRequest(void)
 		return;
 	}
 
-	if (!gRxVfo->DTMF_DECODING_ENABLE && !gSetting_KILLED) {
-		return;
-	}
-
 	if (gDTMF_WriteIndex >= 9) {
 		Offset = gDTMF_WriteIndex - 9;
-		sprintf(String, "%s%c%s", gEeprom.ANI_DTMF_ID, gEeprom.DTMF_SEPARATE_CODE, gEeprom.KILL_CODE);
-		if (DTMF_CompareMessage(gDTMF_Received + Offset, String, 9, true)) {
-			if (gEeprom.PERMIT_REMOTE_KILL) {
-				gSetting_KILLED = true;
-				SETTINGS_SaveSettings();
-				gDTMF_ReplyState = DTMF_REPLY_AB;
-#if defined(ENABLE_FMRADIO)
-				if (gFmRadioMode) {
-					FM_TurnOff();
-					GUI_SelectNextDisplay(DISPLAY_MAIN);
-				}
-#endif
-			} else {
-				gDTMF_ReplyState = DTMF_REPLY_NONE;
-			}
-			gDTMF_CallState = DTMF_CALL_STATE_NONE;
-			gUpdateDisplay = true;
-			gUpdateStatus = true;
-			return;
-		}
-		sprintf(String, "%s%c%s", gEeprom.ANI_DTMF_ID, gEeprom.DTMF_SEPARATE_CODE, gEeprom.REVIVE_CODE);
-		if (DTMF_CompareMessage(gDTMF_Received + Offset, String, 9, true)) {
-			gSetting_KILLED = false;
-			SETTINGS_SaveSettings();
-			gDTMF_ReplyState = DTMF_REPLY_AB;
-			gDTMF_CallState = DTMF_CALL_STATE_NONE;
-			gUpdateDisplay = true;
-			gUpdateStatus = true;
-			return;
-		}
+        return;
 	}
 
 	if (gDTMF_WriteIndex >= 2) {
@@ -246,7 +215,7 @@ void DTMF_HandleRequest(void)
 		}
 	}
 
-	if (gSetting_KILLED || gDTMF_CallState != DTMF_CALL_STATE_NONE) {
+	if (gDTMF_CallState != DTMF_CALL_STATE_NONE) {
 		return;
 	}
 
@@ -286,6 +255,7 @@ void DTMF_HandleRequest(void)
 	}
 }
 
+//#ifdef ENABLE_DTMF_CALLING
 void DTMF_Reply(void)
 {
 	char String[20];
@@ -298,6 +268,7 @@ void DTMF_Reply(void)
 			pString = gDTMF_String;
 		} else {
 			sprintf(String, "%s%c%s", gDTMF_String, gEeprom.DTMF_SEPARATE_CODE, gEeprom.ANI_DTMF_ID);
+			
 			pString = String;
 		}
 		break;
@@ -333,7 +304,6 @@ void DTMF_Reply(void)
 	SYSTEM_DelayMs(Delay);
 
 	BK4819_EnterDTMF_TX(gEeprom.DTMF_SIDE_TONE);
-
 	BK4819_PlayDTMFString(
 		pString,
 		1,
@@ -341,10 +311,9 @@ void DTMF_Reply(void)
 		gEeprom.DTMF_HASH_CODE_PERSIST_TIME,
 		gEeprom.DTMF_CODE_PERSIST_TIME,
 		gEeprom.DTMF_CODE_INTERVAL_TIME);
-
 	GPIO_ClearBit(&GPIOC->DATA, GPIOC_PIN_AUDIO_PATH);
-
 	gEnableSpeaker = false;
 	BK4819_ExitDTMF_TX(false);
 }
 
+#endif

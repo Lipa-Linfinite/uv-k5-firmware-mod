@@ -13,30 +13,36 @@
  *     See the License for the specific language governing permissions and
  *     limitations under the License.
  */
-
 #ifndef BATTERY_H
 #define BATTERY_H
-
 #include <stdbool.h>
 #include <stdint.h>
-
 extern uint16_t gBatteryCalibration[6];
 extern uint16_t gBatteryCurrentVoltage;
 extern uint16_t gBatteryCurrent;
 extern uint16_t gBatteryVoltages[4];
 extern uint16_t gBatteryVoltageAverage;
-
 extern uint8_t gBatteryDisplayLevel;
-
 extern bool gChargingWithTypeC;
 extern bool gLowBattery;
 extern bool gLowBatteryBlink;
-
 extern volatile uint16_t gBatterySave;
 
 extern uint16_t gBatteryCheckCounter;
 
+extern bool              gLowBatteryConfirmed;
+extern uint16_t          gBatteryCheckCounter;
+
+extern volatile uint16_t gPowerSave_10ms;
+#ifdef ENABLE_STATUS_BATTERY_PERC
+typedef enum {
+    BATTERY_TYPE_1600_MAH,
+    BATTERY_TYPE_2200_MAH,
+    BATTERY_TYPE_UNKNOWN
+} BATTERY_Type_t;
+#endif
+
+unsigned int BATTERY_VoltsToPercent(unsigned int voltage_10mV);
 void BATTERY_GetReadings(bool bDisplayBatteryLevel);
 
 #endif
-

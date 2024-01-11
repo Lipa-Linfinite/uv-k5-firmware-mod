@@ -47,11 +47,6 @@ void GENERIC_Key_F(bool bKeyPressed, bool bKeyHeld)
 			if (!bKeyPressed) {
 				return;
 			}
-			if (gEeprom.KEY_LOCK) {
-				gAnotherVoiceID = VOICE_ID_UNLOCK;
-			} else {
-				gAnotherVoiceID = VOICE_ID_LOCK;
-			}
 			gEeprom.KEY_LOCK = !gEeprom.KEY_LOCK;
 			gRequestSaveSettings = true;
 		} else {
@@ -65,9 +60,6 @@ void GENERIC_Key_F(bool bKeyPressed, bool bKeyHeld)
 			}
 #endif
 			gWasFKeyPressed = !gWasFKeyPressed;
-			if (!gWasFKeyPressed) {
-				gAnotherVoiceID = VOICE_ID_CANCEL;
-			}
 			gUpdateStatus = true;
 		}
 	} else {
@@ -143,6 +135,7 @@ void GENERIC_Key_PTT(bool bKeyPressed)
 					return;
 				}
 				gFlagPrepareTX = true;
+#ifdef ENABLE_DTMF_CALLING
 				if (gDTMF_InputMode) {
 					if (gDTMF_InputIndex || gDTMF_PreviousIndex) {
 						if (gDTMF_InputIndex == 0) {
@@ -164,6 +157,7 @@ void GENERIC_Key_PTT(bool bKeyPressed)
 					gDTMF_InputIndex = 0;
 					return;
 				}
+#endif				
 				gRequestDisplayScreen = DISPLAY_MAIN;
 				gFlagPrepareTX = true;
 				gInputBoxIndex = 0;
@@ -185,7 +179,6 @@ void GENERIC_Key_PTT(bool bKeyPressed)
 		gRequestDisplayScreen = DISPLAY_FM;
 #endif
 	}
-	gAnotherVoiceID = VOICE_ID_SCANNING_STOP;
 	gPttWasPressed = true;
 }
 

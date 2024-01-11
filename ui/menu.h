@@ -19,6 +19,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+//#define MENU_ITEMS_COUNT 56
 
 enum {
 	MENU_SQL		= 0,
@@ -31,17 +32,24 @@ enum {
 	MENU_SFT_D,
 	MENU_OFFSET,
 	MENU_W_N,
+#ifdef ENABLE_LIVESEEK_MHZ_KEYPAD
+	MENU_LIVESEEK,
+#endif	
 	MENU_SCR,
 	MENU_BCL,
 	MENU_MEM_CH,
 	MENU_SAVE,
 	MENU_VOX,
 	MENU_ABR,
+	//invert here
+	#ifdef ENABLE_LCD_CONTRAST_OPTION
+	MENU_CONTRAST,
+	#endif
 	MENU_TDR,
 	MENU_WX,
 	MENU_BEEP,
 	MENU_TOT,
-	MENU_VOICE,
+//	MENU_VOICE,
 	MENU_SC_REV,
 	MENU_MDF,
 	MENU_AUTOLK,
@@ -54,9 +62,7 @@ enum {
 	MENU_S_LIST,
 	MENU_SLIST1,
 	MENU_SLIST2,
-#if defined(ENABLE_ALARM)
-	MENU_AL_MOD,
-#endif
+#ifdef ENABLE_DTMF_CALLING
 	MENU_ANI_ID,
 	MENU_UPCODE,
 	MENU_DWCODE,
@@ -67,20 +73,24 @@ enum {
 	MENU_PTT_ID,
 	MENU_D_DCD,
 	MENU_D_LIST,
+#endif	
 	MENU_PONMSG,
+#if defined (ENABLE_ROGERBEEP) || defined (ENABLE_MDC)
 	MENU_ROGER,
-	MENU_VOL,
-	MENU_AM,
-#if defined(ENABLE_NOAA)
-	MENU_NOAA_S,
 #endif
+	MENU_VOL,
+#ifdef ENABLE_STATUS_BATTERY_PERC	
+	MENU_BATTYP,
+#endif
+	MENU_AM,
 	MENU_DEL_CH,
 	MENU_RESET,
+	MENU_UPCONVERTER,	
 	MENU_350TX,
 	MENU_F_LOCK,
 	MENU_200TX,
 	MENU_500TX,
-	MENU_350EN,
+	MENU_ALL_TX,
 	MENU_SCREN,
 };
 
@@ -89,7 +99,16 @@ extern bool gIsInSubMenu;
 extern uint8_t gMenuCursor;
 extern int8_t gMenuScrollDirection;
 extern uint32_t gSubMenuSelection;
-
+#if defined (ENABLE_ROGERBEEP) && defined (ENABLE_MDC)
+extern const char gSubMenu_ROGER[10][9];
+#elif defined (ENABLE_ROGERBEEP) && !defined (ENABLE_MDC)
+extern const char gSubMenu_ROGER[9][9];
+#elif defined (ENABLE_MDC) && !defined (ENABLE_ROGERBEEP)
+extern const char gSubMenu_ROGER[2][4];
+#endif
+#ifdef ENABLE_LIVESEEK_MHZ_KEYPAD
+extern const char gSubMenu_LIVESEEK[3][6];
+#endif
 void UI_DisplayMenu(void);
 
 #endif

@@ -17,7 +17,10 @@
 #ifndef UI_RSSI_H
 #define UI_RSSI_H
 
-void UI_UpdateRSSI(uint16_t RSSI);
-
+#include <stdint.h>
+void UI_DisplayRSSIBar(int16_t rssi);
+#ifdef ENABLE_MIC_PLUS_GAIN_BAR_TX
+void UI_DisplayMICBar(void);
+#endif
 #endif
 

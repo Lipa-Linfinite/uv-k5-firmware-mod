@@ -20,7 +20,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "radio.h"
-
+#ifdef ENABLE_STATUS_BATTERY_PERC	
+#include <helper/battery.h>
+#endif
 enum POWER_OnDisplayMode_t {
 	POWER_ON_DISPLAY_MODE_FULL_SCREEN = 0U,
 	POWER_ON_DISPLAY_MODE_MESSAGE     = 1U,
@@ -34,8 +36,7 @@ enum {
 	F_LOCK_FCC = 1U,
 	F_LOCK_CE  = 2U,
 	F_LOCK_GB  = 3U,
-	F_LOCK_430 = 4U,
-	F_LOCK_438 = 5U,
+	F_LOCK_LPD_PMR = 4U,
 };
 
 enum {
@@ -83,18 +84,45 @@ enum ALARM_Mode_t {
 
 typedef enum ALARM_Mode_t ALARM_Mode_t;
 
+#if defined (ENABLE_ROGERBEEP) && defined (ENABLE_MDC)
 enum ROGER_Mode_t {
-	ROGER_MODE_OFF   = 0U,
-	ROGER_MODE_ROGER = 1U,
-	ROGER_MODE_MDC   = 2U,
+	ROGER_MODE_OFF,
+	ROGER_MODE_DEFAULT,
+	ROGER_MODE_MOTOTRBO,
+	ROGER_MODE_TPT,
+	ROGER_MODE_MOTOTRBOT40,
+	ROGER_MODE_MOTOTRBOTLKRT80,
+	ROGER_MODE_ROGERCOBRAAM845,
+	ROGER_MODE_POLICE_ITA,
+	ROGER_MODE_UV5RC,	
+	ROGER_MODE_MDC,
 };
-
+#elif defined (ENABLE_ROGERBEEP) && !defined (ENABLE_MDC)
+enum ROGER_Mode_t {
+	ROGER_MODE_OFF,
+	ROGER_MODE_DEFAULT,
+	ROGER_MODE_MOTOTRBO,
+	ROGER_MODE_TPT,
+	ROGER_MODE_MOTOTRBOT40,
+	ROGER_MODE_MOTOTRBOTLKRT80,
+	ROGER_MODE_ROGERCOBRAAM845,
+	ROGER_MODE_POLICE_ITA,
+	ROGER_MODE_UV5RC,/*
+	ROGER_MODE_ROGERMARIO,*/
+};
+#elif !defined (ENABLE_ROGERBEEP) && defined (ENABLE_MDC)
+enum ROGER_Mode_t {
+	ROGER_MODE_OFF,	
+	ROGER_MODE_MDC,
+};
+#endif
 typedef enum ROGER_Mode_t ROGER_Mode_t;
 
 enum CHANNEL_DisplayMode_t {
-	MDF_FREQUENCY = 0U,
-	MDF_CHANNEL   = 1U,
-	MDF_NAME      = 2U,
+	MDF_FREQUENCY,
+	MDF_CHANNEL,
+	MDF_NAME,
+    MDF_NAME_FREQ,
 };
 
 typedef enum CHANNEL_DisplayMode_t CHANNEL_DisplayMode_t;
@@ -104,11 +132,14 @@ typedef struct {
 	uint8_t FreqChannel[2];
 	uint8_t MrChannel[2];
 	uint8_t NoaaChannel[2];
-	uint8_t RX_VFO;
-	uint8_t TX_VFO;
+	uint8_t RX_CHANNEL;
+	uint8_t TX_CHANNEL;
 	uint8_t field7_0xa;
 	uint8_t field8_0xb;
 	uint32_t POWER_ON_PASSWORD;
+#ifdef ENABLE_STATUS_BATTERY_PERC	
+	BATTERY_Type_t		  BATTERY_TYPE;
+#endif
 	uint8_t SQUELCH_LEVEL;
 	uint8_t TX_TIMEOUT_TIMER;
 	bool KEY_LOCK;
@@ -143,7 +174,12 @@ typedef struct {
 	bool AUTO_KEYPAD_LOCK;
 	ALARM_Mode_t ALARM_MODE;
 	POWER_OnDisplayMode_t POWER_ON_DISPLAY_MODE;
+#if defined (ENABLE_ROGERBEEP) || defined (ENABLE_MDC)
 	ROGER_Mode_t ROGER;
+#endif
+#ifdef ENABLE_LCD_CONTRAST_OPTION
+uint8_t LCD_CONTRAST;
+#endif
 	uint8_t REPEATER_TAIL_TONE_ELIMINATION;
 	uint8_t KEY_1_SHORT_PRESS_ACTION;
 	uint8_t KEY_1_LONG_PRESS_ACTION;
@@ -189,6 +225,6 @@ void SETTINGS_SaveVfoIndices(void);
 void SETTINGS_SaveSettings(void);
 void SETTINGS_SaveChannel(uint8_t Channel, uint8_t VFO, const VFO_Info_t *pVFO, uint8_t Mode);
 void SETTINGS_UpdateChannel(uint8_t Channel, const VFO_Info_t *pVFO, bool bUpdate);
-
+void GetChannelName(uint8_t num, char *name);
 #endif
 

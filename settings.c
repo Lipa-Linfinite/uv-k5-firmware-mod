@@ -24,7 +24,9 @@
 #endif
 #include "misc.h"
 #include "settings.h"
-
+#ifdef ENABLE_LIVESEEK_MHZ_KEYPAD
+#include "app/ceccommon.h"
+#endif
 EEPROM_Config_t gEeprom;
 
 #if defined(ENABLE_FMRADIO)
@@ -100,7 +102,11 @@ void SETTINGS_SaveSettings(void)
 	State[3] = gEeprom.BATTERY_SAVE;
 	State[4] = gEeprom.DUAL_WATCH;
 	State[5] = gEeprom.BACKLIGHT;
+	#ifdef ENABLE_LCD_CONTRAST_OPTION
+	State[6] = (gEeprom.LCD_CONTRAST & 0x7F) | (gEeprom.TAIL_NOTE_ELIMINATION << 7);
+	#else
 	State[6] = gEeprom.TAIL_NOTE_ELIMINATION;
+	#endif
 	State[7] = gEeprom.VFO_OPEN;
 
 	EEPROM_WriteBuffer(0x0E78, State);
@@ -120,7 +126,7 @@ void SETTINGS_SaveSettings(void)
 
 	Password[0] = gEeprom.POWER_ON_PASSWORD;
 
-	EEPROM_WriteBuffer(0x0E98, Password);
+	EEPROM_WriteBuffer(0x0E98, State);
 
 	memset(State, 0xFF, sizeof(State));
 
@@ -128,17 +134,18 @@ void SETTINGS_SaveSettings(void)
 
 	EEPROM_WriteBuffer(0x0EA0, State);
 
-#if defined(ENABLE_ALARM)
-	State[0] = gEeprom.ALARM_MODE;
-#else
 	State[0] = 0xFF;
-#endif
+#if defined (ENABLE_ROGERBEEP) || defined (ENABLE_MDC)
 	State[1] = gEeprom.ROGER;
+#endif
 	State[2] = gEeprom.REPEATER_TAIL_TONE_ELIMINATION;
-	State[3] = gEeprom.TX_VFO;
-
+	State[3] = gEeprom.TX_CHANNEL;
+#ifdef ENABLE_STATUS_BATTERY_PERC	
+	State[4] = gEeprom.BATTERY_TYPE;
+#endif	
 	EEPROM_WriteBuffer(0x0EA8, State);
 
+#ifdef ENABLE_DTMF_CALLING
 	State[0] = gEeprom.DTMF_SIDE_TONE;
 	State[1] = gEeprom.DTMF_SEPARATE_CODE;
 	State[2] = gEeprom.DTMF_GROUP_CALL_CODE;
@@ -149,7 +156,6 @@ void SETTINGS_SaveSettings(void)
 	State[7] = gEeprom.DTMF_HASH_CODE_PERSIST_TIME / 10U;
 
 	EEPROM_WriteBuffer(0x0ED0, State);
-
 	memset(State, 0xFF, sizeof(State));
 
 	State[0] = gEeprom.DTMF_CODE_PERSIST_TIME / 10U;
@@ -157,7 +163,7 @@ void SETTINGS_SaveSettings(void)
 	State[2] = gEeprom.PERMIT_REMOTE_KILL;
 
 	EEPROM_WriteBuffer(0x0ED8, State);
-
+#endif
 	State[0] = gEeprom.SCAN_LIST_DEFAULT;
 	State[1] = gEeprom.SCAN_LIST_ENABLED[0];
 	State[2] = gEeprom.SCANLIST_PRIORITY_CH1[0];
@@ -173,13 +179,26 @@ void SETTINGS_SaveSettings(void)
 
 	State[0] = gSetting_F_LOCK;
 	State[1] = gSetting_350TX;
-	State[2] = gSetting_KILLED;
+	State[2] = false;
 	State[3] = gSetting_200TX;
 	State[4] = gSetting_500TX;
-	State[5] = gSetting_350EN;
+	State[5] = gSetting_ALL_TX;
 	State[6] = gSetting_ScrambleEnable;
 
 	EEPROM_WriteBuffer(0x0F40, State);
+#ifdef ENABLE_LIVESEEK_MHZ_KEYPAD
+	//KD8CEC WORK ===================================
+	State[0] = CEC_LiveSeekMode;
+	State[1] = CW_KEYTYPE;
+	State[2] = CW_SPEED;
+	State[3] = CW_TONE;
+	State[4] = 0xFF;
+	State[5] = 0xFF;
+	State[6] = 0xFF;
+	State[7] = 0xFF;
+	EEPROM_WriteBuffer(CEC_EEPROM_START1 + 0, State);
+	//END OF KD8CEC WORK ============================		
+#endif	
 }
 
 void SETTINGS_SaveChannel(uint8_t Channel, uint8_t VFO, const VFO_Info_t *pVFO, uint8_t Mode)
@@ -230,9 +249,19 @@ void SETTINGS_SaveChannel(uint8_t Channel, uint8_t VFO, const VFO_Info_t *pVFO, 
 			SETTINGS_UpdateChannel(Channel, pVFO, true);
 
 			if (IS_MR_CHANNEL(Channel)) {
+#ifndef ENABLE_KEEPNAMEONSAVE					
 				memset(&State32, 0xFF, sizeof(State32));
 				EEPROM_WriteBuffer(OffsetMR + 0x0F50, State32);
 				EEPROM_WriteBuffer(OffsetMR + 0x0F58, State32);
+#else				  
+				if (Mode >= 3) {	// save the channel name - source OneOfEleven
+					memmove(State8, pVFO->Name + 0, 8);
+					EEPROM_WriteBuffer(0x0F50 + OffsetMR, State8);
+					memset(State8, 0xFF, sizeof(State8));
+					memmove(State8, pVFO->Name + 8, 2);
+					EEPROM_WriteBuffer(0x0F58 + OffsetMR, State8);
+				}
+#endif													 
 			}
 		}
 	}
@@ -268,3 +297,7 @@ void SETTINGS_UpdateChannel(uint8_t Channel, const VFO_Info_t *pVFO, bool bUpdat
 	}
 }
 
+void GetChannelName(uint8_t num, char *name) {
+  memset(name, 0, 16);
+  EEPROM_ReadBuffer(0x0F50 + (num * 0x10), name, 10);
+}

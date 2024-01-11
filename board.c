@@ -43,6 +43,17 @@
 #if defined(ENABLE_OVERLAY)
 #include "sram-overlay.h"
 #endif
+#ifdef ENABLE_LIVESEEK_MHZ_KEYPAD
+#include "app/ceccommon.h"
+#endif
+
+static const uint32_t gDefaultFrequencyTable[5] = {
+	14502500,
+	14552500,
+	43477500,
+	43502500,
+	43697500,
+};
 
 #if defined(ENABLE_OVERLAY)
 void BOARD_FLASH_Init(void)
@@ -526,12 +537,17 @@ void BOARD_EEPROM_Init(void)
 
 	// 0E78..0E7F
 	EEPROM_ReadBuffer(0x0E78, Data, 8);
-	gEeprom.CHANNEL_DISPLAY_MODE  = (Data[1] < 3) ? Data[1] : MDF_FREQUENCY;
+	gEeprom.CHANNEL_DISPLAY_MODE  = (Data[1] < 4) ? Data[1] : MDF_FREQUENCY;
 	gEeprom.CROSS_BAND_RX_TX      = (Data[2] < 3) ? Data[2] : CROSS_BAND_OFF;
 	gEeprom.BATTERY_SAVE          = (Data[3] < 5) ? Data[3] : 4;
 	gEeprom.DUAL_WATCH            = (Data[4] < 3) ? Data[4] : DUAL_WATCH_CHAN_A;
-	gEeprom.BACKLIGHT             = (Data[5] < 6) ? Data[5] : 5;
+	gEeprom.BACKLIGHT             = (Data[5] < 7) ? Data[5] : 6;
+	#ifdef ENABLE_LCD_CONTRAST_OPTION
+	gEeprom.TAIL_NOTE_ELIMINATION = (Data[6] >> 7) & 1;
+	gEeprom.LCD_CONTRAST		  = Data[6] & 0x7F;
+	#else
 	gEeprom.TAIL_NOTE_ELIMINATION = (Data[6] < 2) ? Data[6] : true;
+	#endif
 	gEeprom.VFO_OPEN              = (Data[7] < 2) ? Data[7] : true;
 
 	// 0E80..0E87
@@ -542,10 +558,6 @@ void BOARD_EEPROM_Init(void)
 	gEeprom.MrChannel[1]     = IS_MR_CHANNEL(Data[4])    ? Data[4] : MR_CHANNEL_FIRST;
 	gEeprom.FreqChannel[0]   = IS_FREQ_CHANNEL(Data[2])  ? Data[2] : (FREQ_CHANNEL_FIRST + BAND6_400MHz);
 	gEeprom.FreqChannel[1]   = IS_FREQ_CHANNEL(Data[5])  ? Data[5] : (FREQ_CHANNEL_FIRST + BAND6_400MHz);
-#if defined(ENABLE_NOAA)
-	gEeprom.NoaaChannel[0]   = IS_NOAA_CHANNEL(Data[6])  ? Data[6] : NOAA_CHANNEL_FIRST;
-	gEeprom.NoaaChannel[1]   = IS_NOAA_CHANNEL(Data[7])  ? Data[7] : NOAA_CHANNEL_FIRST;
-#endif
 
 #if defined(ENABLE_FMRADIO)
 	// 0E88..0E8F
@@ -582,25 +594,36 @@ void BOARD_EEPROM_Init(void)
 	gEeprom.KEY_2_LONG_PRESS_ACTION  = (Data[4] < 9) ? Data[4] : 6;
 	gEeprom.SCAN_RESUME_MODE         = (Data[5] < 3) ? Data[5] : SCAN_RESUME_CO;
 	gEeprom.AUTO_KEYPAD_LOCK         = (Data[6] < 2) ? Data[6] : true;
-	gEeprom.POWER_ON_DISPLAY_MODE    = (Data[7] < 3) ? Data[7] : POWER_ON_DISPLAY_MODE_MESSAGE;
+	gEeprom.POWER_ON_DISPLAY_MODE    = (Data[7] < 3) ? Data[7] : POWER_ON_DISPLAY_MODE_VOLTAGE;
 
 	// 0E98..0E9F
+
+	//Password Normal / Password interna
 	EEPROM_ReadBuffer(0x0E98, Data, 8);
 	memcpy(&gEeprom.POWER_ON_PASSWORD, Data, 4);
+	//memcpy(&gEeprom.POWER_ON_PASSWORD, "\x4f\xa5\x05\x00", 4);
 
+	
 	// 0EA0..0EA7
 	EEPROM_ReadBuffer(0x0EA0, Data, 8);
 	gEeprom.VOICE_PROMPT = (Data[0] < 3) ? Data[0] : VOICE_PROMPT_CHINESE;
 
 	// 0EA8..0EAF
 	EEPROM_ReadBuffer(0x0EA8, Data, 8);
-#if defined(ENABLE_ALARM)
-	gEeprom.ALARM_MODE                     = (Data[0] <  2) ? Data[0] : true;
-#endif
-	gEeprom.ROGER                          = (Data[1] <  3) ? Data[1] : ROGER_MODE_OFF;
-	gEeprom.REPEATER_TAIL_TONE_ELIMINATION = (Data[2] < 11) ? Data[2] : 0;
-	gEeprom.TX_VFO                         = (Data[3] <  2) ? Data[3] : 0;
 
+#if defined(ENABLE_ROGERBEEP) && defined(ENABLE_MDC)
+	gEeprom.ROGER                          = (Data[1] <  10) ? Data[1] : ROGER_MODE_OFF;
+#elif !defined(ENABLE_MDC) && defined(ENABLE_ROGERBEEP)
+	gEeprom.ROGER                          = (Data[1] <  9) ? Data[1] : ROGER_MODE_OFF;			
+#elif defined (ENABLE_MDC) && !defined(ENABLE_ROGERBEEP)
+	gEeprom.ROGER                          = (Data[1] <  2) ? Data[1] : ROGER_MODE_OFF;	
+#endif
+	gEeprom.REPEATER_TAIL_TONE_ELIMINATION = (Data[2] < 11) ? Data[2] : 0;
+	gEeprom.TX_CHANNEL                     = (Data[3] <  2) ? Data[3] : 0;
+#ifdef ENABLE_STATUS_BATTERY_PERC	
+	gEeprom.BATTERY_TYPE = (Data[4] < BATTERY_TYPE_UNKNOWN) ? Data[4] : BATTERY_TYPE_1600_MAH;
+#endif	
+#ifdef ENABLE_DTMF_CALLING
 	// 0ED0..0ED7
 	EEPROM_ReadBuffer(0x0ED0, Data, 8);
 	gEeprom.DTMF_SIDE_TONE               = (Data[0] <   2) ? Data[0] : true;
@@ -628,12 +651,7 @@ void BOARD_EEPROM_Init(void)
 	}
 
 	// 0EE8..0EEF
-	EEPROM_ReadBuffer(0x0EE8, Data, 8);
-	if (DTMF_ValidateCodes((char *)Data, 8)) {
-		memcpy(gEeprom.KILL_CODE, Data, 8);
-	} else {
-		memcpy(gEeprom.KILL_CODE, "ABCD9\0\0", 8);
-	}
+    // Killcode removed
 
 	// 0EF0..0EF7
 	EEPROM_ReadBuffer(0x0EF0, Data, 8);
@@ -658,7 +676,8 @@ void BOARD_EEPROM_Init(void)
 	} else {
 		memcpy(gEeprom.DTMF_DOWN_CODE, "54321\0\0\0\0\0\0\0\0\0\0", 16);
 	}
-
+#endif
+/*
 	// 0F18..0F1F
 	EEPROM_ReadBuffer(0x0F18, Data, 8);
 
@@ -670,19 +689,40 @@ void BOARD_EEPROM_Init(void)
 		gEeprom.SCANLIST_PRIORITY_CH1[i] = Data[j + 1];
 		gEeprom.SCANLIST_PRIORITY_CH2[i] = Data[j + 2];
 	}
+*/
+
+// 0F18..0F1F
+EEPROM_ReadBuffer(0x0F18, Data, 8);
+
+gEeprom.SCAN_LIST_DEFAULT = (Data[0] < 3) ? Data[0] : false;
+
+for (int i = 0; i < 2; i++) {
+    uint8_t j = (i * 3) + 1;
+    gEeprom.SCAN_LIST_ENABLED[i]     = (Data[j] < 3) ? Data[j] : false;
+    gEeprom.SCANLIST_PRIORITY_CH1[i] = Data[j + 1];
+    gEeprom.SCANLIST_PRIORITY_CH2[i] = Data[j + 2];
+/*
+    // Verifique se o canal não é um canal de usuário
+    if (!IS_USER_CHANNEL(gEeprom.SCAN_LIST_PRIORITY_CH1[i])) {
+        gEeprom.SCANLIST_PRIORITY_CH1[i] = 0xFF;
+    }
+
+    if (!IS_USER_CHANNEL(gEeprom.SCAN_LIST_PRIORITY_CH2[i])) {
+        gEeprom.SCANLIST_PRIORITY_CH2[i] = 0xFF;
+    }
+	*/
+}
+
+//gEeprom.UNUSED_10 = 0xFF;
 
 	// 0F40..0F47
 	EEPROM_ReadBuffer(0x0F40, Data, 8);
 	gSetting_F_LOCK         = (Data[0] < 6) ? Data[0] : F_LOCK_OFF;
 
-	gUpperLimitFrequencyBandTable = UpperLimitFrequencyBandTable;
-	gLowerLimitFrequencyBandTable = LowerLimitFrequencyBandTable;
-
 	gSetting_350TX          = (Data[1] < 2) ? Data[1] : true;
-	gSetting_KILLED         = (Data[2] < 2) ? Data[2] : false;
 	gSetting_200TX          = (Data[3] < 2) ? Data[3] : false;
 	gSetting_500TX          = (Data[4] < 2) ? Data[4] : false;
-	gSetting_350EN          = (Data[5] < 2) ? Data[5] : true;
+	gSetting_ALL_TX          = (Data[5] < 2) ? Data[5] : 2;
 	gSetting_ScrambleEnable = (Data[6] < 2) ? Data[6] : true;
 
 	if (!gEeprom.VFO_OPEN) {
@@ -702,7 +742,16 @@ void BOARD_EEPROM_Init(void)
 			return;
 		}
 	}
-
+#ifdef ENABLE_LIVESEEK_MHZ_KEYPAD
+	
+	//KD8CEC WORK ===================================
+	EEPROM_ReadBuffer(CEC_EEPROM_START1 + 0, Data, 8);
+	CEC_LiveSeekMode = Data[0] < 7 ? Data[0] : 0;  //
+	CW_KEYTYPE 		 = Data[1] < 7 ? Data[1] : 0;  //
+	CW_SPEED 		 = Data[2] < 51 && Data[2] > 4 ? Data[2] : 10;  //
+	CW_TONE 		 = Data[3] < 120 ? Data[3] : 70;  //
+	//END OF KD8CEC WORK ============================	
+#endif
 	bHasCustomAesKey = false;
 }
 
@@ -773,6 +822,17 @@ void BOARD_FactoryReset(bool bIsAll)
 				!(i >= 0x0E88 && i < 0x0E90))) // FM settings
 			) {
 			EEPROM_WriteBuffer(i, Template);
+		}
+	}
+	if (bIsAll) {
+		RADIO_InitInfo(gRxVfo, FREQ_CHANNEL_FIRST + 5, 5, 41002500);
+		for (i = 0; i < 5; i++) {
+			const uint32_t Frequency = gDefaultFrequencyTable[i];
+
+			gRxVfo->ConfigRX.Frequency = Frequency;
+			gRxVfo->ConfigTX.Frequency = Frequency;
+			gRxVfo->Band = FREQUENCY_GetBand(Frequency);
+			SETTINGS_SaveChannel(MR_CHANNEL_FIRST + i, 0, gRxVfo, 2);
 		}
 	}
 }

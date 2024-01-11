@@ -18,6 +18,10 @@
 #define UI_WELCOME_H
 
 void UI_DisplayWelcome(void);
+void UI_DisplayInfo(void);
+void UI_DisplayVersion(void);
+void UI_DisplayVersionFM(void);
+void UI_Matoz(void);
 
 #endif
 

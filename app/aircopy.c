@@ -51,7 +51,7 @@ void AIRCOPY_SendMessage(void)
 	RADIO_SetTxParameters();
 	BK4819_SendFSKData(g_FSK_Buffer);
 	BK4819_SetupPowerAmplifier(0, 0);
-	BK4819_ToggleGpioOut(BK4819_GPIO1_PIN29_PA_ENABLE, false);
+	BK4819_ToggleGpioOut(BK4819_GPIO5_PIN1, false);
 	gAircopySendCountdown = 30;
 }
 
@@ -109,14 +109,12 @@ static void AIRCOPY_Key_DIGITS(KEY_Code_t Key, bool bKeyPressed, bool bKeyHeld)
 		INPUTBOX_Append(Key);
 		gRequestDisplayScreen = DISPLAY_AIRCOPY;
 		if (gInputBoxIndex < 6) {
-			gAnotherVoiceID = (VOICE_ID_t)Key;
 			return;
 		}
 		gInputBoxIndex = 0;
 		NUMBER_Get(gInputBox, &Frequency);
-		for (i = 0; i < 7; i++) {
-			if (Frequency >= gLowerLimitFrequencyBandTable[i] && Frequency <= gUpperLimitFrequencyBandTable[i]) {
-				gAnotherVoiceID = (VOICE_ID_t)Key;
+		for (i = 0; i < ARRAY_SIZE(FrequencyBandTable); i++) {
+            if (Frequency >= FrequencyBandTable[i].lower && Frequency <= FrequencyBandTable[i].upper) {
 				gRxVfo->Band = i;
 				Frequency += 75;
 				Frequency = FREQUENCY_FloorToStep(Frequency, gRxVfo->StepFrequency, 0);
