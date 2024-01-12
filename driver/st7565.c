@@ -15,6 +15,8 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>     // NULL
+
 #include "bsp/dp32g030/gpio.h"
 #include "bsp/dp32g030/spi.h"
 #include "driver/gpio.h"
@@ -23,155 +25,231 @@
 #include "driver/system.h"
 #include "misc.h"
 
-uint8_t gStatusLine[128];
-uint8_t gFrameBuffer[7][128];
+uint8_t g_status_line[128];
+uint8_t g_frame_buffer[7][128];
 
-void ST7565_DrawLine(uint8_t Column, uint8_t Line, uint16_t Size, const uint8_t *pBitmap, bool bIsClearMode)
+#ifdef ENABLE_CONTRAST
+	uint8_t contrast = 31;  // 0 ~ 63
+#endif
+
+static void ST7565_WriteByte(uint8_t Value);
+
+static inline void ST7565_LowLevelWrite(uint8_t Value)
 {
-	uint16_t i;
+        /* Wait for space in the fifo */
+        while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {}
+        SPI0->WDR = Value;
+}
+
+void ST7565_DrawLine(const unsigned int Column, const unsigned int Line, const unsigned int Size, const uint8_t *pBitmap)
+{
+	unsigned int i;
 
 	SPI_ToggleMasterMode(&SPI0->CR, false);
+
 	ST7565_SelectColumnAndLine(Column + 4U, Line);
+
 	GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_ST7565_A0);
 
-	if (!bIsClearMode) {
-		for (i = 0; i < Size; i++) {
-			while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-			}
-			SPI0->WDR = pBitmap[i];
+	if (pBitmap != NULL)
+	{
+		for (i = 0; i < Size; i++)
+		{
+                    ST7565_LowLevelWrite(pBitmap[i]);
 		}
-	} else {
-		for (i = 0; i < Size; i++) {
-			while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-			}
-			SPI0->WDR = 0;
+	}
+	else
+	{
+		for (i = 0; i < Size; i++)
+		{
+                    ST7565_LowLevelWrite(0);
 		}
 	}
 
 	SPI_WaitForUndocumentedTxFifoStatusBit();
+
 	SPI_ToggleMasterMode(&SPI0->CR, true);
 }
 
 void ST7565_BlitFullScreen(void)
 {
-	uint8_t Line;
-	uint8_t Column;
+	unsigned int Line;
+
+	// reset some of the displays settings to try and overcome the
+	// radios hardware problem - RF corrupting the display
+	ST7565_Init(false);
 
 	SPI_ToggleMasterMode(&SPI0->CR, false);
+
 	ST7565_WriteByte(0x40);
 
-	for (Line = 0; Line < ARRAY_SIZE(gFrameBuffer); Line++) {
-		ST7565_SelectColumnAndLine(4U, Line + 1U);
+	for (Line = 0; Line < ARRAY_SIZE(g_frame_buffer); Line++)
+	{
+		unsigned int Column;
+		ST7565_SelectColumnAndLine(4, Line + 1);
 		GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_ST7565_A0);
-		for (Column = 0; Column < ARRAY_SIZE(gFrameBuffer[0]); Column++) {
-			while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-			}
-			SPI0->WDR = gFrameBuffer[Line][Column];
+		for (Column = 0; Column < ARRAY_SIZE(g_frame_buffer[0]); Column++)
+		{
+                    ST7565_LowLevelWrite(g_frame_buffer[Line][Column]);
 		}
 		SPI_WaitForUndocumentedTxFifoStatusBit();
 	}
 
-	SYSTEM_DelayMs(20);
+	#if 0
+		// whats the delay for, it holds things up :(
+		SYSTEM_DelayMs(20);
+	#else
+//		SYSTEM_DelayMs(1);
+	#endif
+
 	SPI_ToggleMasterMode(&SPI0->CR, true);
 }
 
 void ST7565_BlitStatusLine(void)
-{
-	uint8_t i;
+{	// the top small text line on the display
+
+	unsigned int i;
 
 	SPI_ToggleMasterMode(&SPI0->CR, false);
-	ST7565_WriteByte(0x40);
+
+	ST7565_WriteByte(0x40);    // start line ?
+
 	ST7565_SelectColumnAndLine(4, 0);
+
 	GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_ST7565_A0);
 
-	for (i = 0; i < ARRAY_SIZE(gStatusLine); i++) {
-		while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-		}
-		SPI0->WDR = gStatusLine[i];
+	for (i = 0; i < ARRAY_SIZE(g_status_line); i++)
+	{
+                ST7565_LowLevelWrite(g_status_line[i]);
 	}
+
 	SPI_WaitForUndocumentedTxFifoStatusBit();
+
 	SPI_ToggleMasterMode(&SPI0->CR, true);
 }
 
-void ST7565_FillScreen(uint8_t Value)
+void ST7565_FillScreen(const uint8_t Value)
 {
-	uint8_t i, j;
+	unsigned int i;
+
+	// reset some of the displays settings to try and overcome the
+	// radios hardware problem - RF corrupting the display
+	ST7565_Init(false);
 
 	SPI_ToggleMasterMode(&SPI0->CR, false);
-	for (i = 0; i < 8; i++) {
+
+	for (i = 0; i < 8; i++)
+	{
+		unsigned int j;
 		ST7565_SelectColumnAndLine(0, i);
 		GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_ST7565_A0);
-		for (j = 0; j < 132; j++) {
-			while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-			}
-			SPI0->WDR = Value;
+		for (j = 0; j < 132; j++)
+		{
+                        ST7565_LowLevelWrite(Value);
 		}
 		SPI_WaitForUndocumentedTxFifoStatusBit();
 	}
+
 	SPI_ToggleMasterMode(&SPI0->CR, true);
 }
 
-void ST7565_Init(void)
+void ST7565_Init(const bool full)
 {
-	SPI0_Init();
-	ST7565_HardwareReset();
+	if (full)
+	{
+		SPI0_Init();
+		ST7565_HardwareReset();
+	}
+
 	SPI_ToggleMasterMode(&SPI0->CR, false);
-	ST7565_WriteByte(0xE2);
-	SYSTEM_DelayMs(0x78);
-	ST7565_WriteByte(0xA2);
-	ST7565_WriteByte(0xC0);
-	ST7565_WriteByte(0xA1);
-	ST7565_WriteByte(0xA6);
-	ST7565_WriteByte(0xA4);
-	ST7565_WriteByte(0x24);
-	ST7565_WriteByte(0x81);
-	ST7565_WriteByte(0x1F);
-	ST7565_WriteByte(0x2B);
-	SYSTEM_DelayMs(1);
-	ST7565_WriteByte(0x2E);
-	SYSTEM_DelayMs(1);
-	ST7565_WriteByte(0x2F);
-	ST7565_WriteByte(0x2F);
-	ST7565_WriteByte(0x2F);
-	ST7565_WriteByte(0x2F);
-	SYSTEM_DelayMs(0x28);
-	ST7565_WriteByte(0x40);
-	ST7565_WriteByte(0xAF);
+
+	if (full)
+	{
+		ST7565_WriteByte(0xE2);      // internal reset
+		SYSTEM_DelayMs(120);
+	}
+	
+	ST7565_WriteByte(0xA2);          // bias 9
+//	ST7565_WriteByte(0xA3);          // bias 7
+
+	ST7565_WriteByte(0xC0);          // COM normal
+//	ST7565_WriteByte(0xC8);          // COM reverse
+
+//	ST7565_WriteByte(0xA0);          // normal ADC .. mirrors the screen
+	ST7565_WriteByte(0xA1);          // reverse ADC
+
+	ST7565_WriteByte(0xA6);          // normal screen
+//	ST7565_WriteByte(0xA7);          // inverse screen
+
+	ST7565_WriteByte(0xA4);          // all points normal
+
+	ST7565_WriteByte(0x24);          // ???
+
+	ST7565_WriteByte(0x81);          //
+	#ifdef ENABLE_CONTRAST
+		ST7565_WriteByte(contrast);  // brightness 0 ~ 63
+	#else
+		ST7565_WriteByte(31);        // brightness 0 ~ 63
+	#endif
+
+	if (full)
+	{
+		ST7565_WriteByte(0x28 | 4u); // enable voltage converter VC=1 VR=0 VF=0
+		SYSTEM_DelayMs(50);
+
+		ST7565_WriteByte(0x28 | 6u); // enable voltage regulator VC=1 VR=1 VF=0
+		SYSTEM_DelayMs(50);
+
+		ST7565_WriteByte(0x28 | 7u); // enable voltage follower  VC=1 VR=1 VF=1
+		SYSTEM_DelayMs(10);
+
+		ST7565_WriteByte(0x20 | 6u); // set lcd operating voltage (regulator resistor, ref voltage resistor)
+	}
+
+	ST7565_WriteByte(0x40);          // start line ?
+	ST7565_WriteByte(0xAF);          // display on ?
+
 	SPI_WaitForUndocumentedTxFifoStatusBit();
+
 	SPI_ToggleMasterMode(&SPI0->CR, true);
-	ST7565_FillScreen(0x00);
+
+	if (full)
+		ST7565_FillScreen(0x00);
 }
 
 void ST7565_HardwareReset(void)
 {
-	GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_ST7565_RES);
+	GPIO_SetBit(  &GPIOB->DATA, GPIOB_PIN_ST7565_RES);
 	SYSTEM_DelayMs(1);
 	GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_ST7565_RES);
 	SYSTEM_DelayMs(20);
-	GPIO_SetBit(&GPIOB->DATA, GPIOB_PIN_ST7565_RES);
+	GPIO_SetBit(  &GPIOB->DATA, GPIOB_PIN_ST7565_RES);
 	SYSTEM_DelayMs(120);
 }
 
-void ST7565_SelectColumnAndLine(uint8_t Column, uint8_t Line)
+void ST7565_SelectColumnAndLine(const uint8_t Column, const uint8_t Line)
 {
 	GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_ST7565_A0);
-	while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-	}
-	SPI0->WDR = Line + 0xB0;
-	while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-	}
-	SPI0->WDR = ((Column >> 4) & 0x0F) | 0x10;
-	while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-	}
-	SPI0->WDR = ((Column >> 0) & 0x0F);
+        ST7565_LowLevelWrite(Line + 0xB0);
+        ST7565_LowLevelWrite(((Column >> 4) & 0x0F) | 0x10);
+        ST7565_LowLevelWrite((Column >> 0) & 0x0F);
 	SPI_WaitForUndocumentedTxFifoStatusBit();
 }
 
-void ST7565_WriteByte(uint8_t Value)
+static void ST7565_WriteByte(uint8_t Value)
 {
 	GPIO_ClearBit(&GPIOB->DATA, GPIOB_PIN_ST7565_A0);
-	while ((SPI0->FIFOST & SPI_FIFOST_TFF_MASK) != SPI_FIFOST_TFF_BITS_NOT_FULL) {
-	}
-	SPI0->WDR = Value;
+        ST7565_LowLevelWrite(Value);
 }
 
+#ifdef ENABLE_CONTRAST
+	void ST7565_SetContrast(const uint8_t value)
+	{
+		contrast = (value > 45) ? 45 : (value < 26) ? 26 : value;
+	}
+
+	uint8_t ST7565_GetContrast(void)
+	{
+		return contrast;
+	}
+#endif

@@ -19,21 +19,21 @@
 
 #include <stdint.h>
 
-enum FUNCTION_Type_t {
-	FUNCTION_FOREGROUND = 0U,
-	FUNCTION_TRANSMIT   = 1U,
-	FUNCTION_MONITOR    = 2U,
-	FUNCTION_INCOMING   = 3U,
-	FUNCTION_RECEIVE    = 4U,
-	FUNCTION_POWER_SAVE = 5U,
+enum function_type_e
+{
+	FUNCTION_FOREGROUND = 0,  // idle, scanning
+	FUNCTION_TRANSMIT,        // transmitting
+//	FUNCTION_MONITOR,         // receiving with squelch forced open
+	FUNCTION_NEW_RECEIVE,     // signal just received
+	FUNCTION_RECEIVE,         // receive mode
+	FUNCTION_POWER_SAVE       // sleeping
 };
+typedef enum function_type_e function_type_t;
 
-typedef enum FUNCTION_Type_t FUNCTION_Type_t;
-
-extern FUNCTION_Type_t gCurrentFunction;
+extern function_type_t g_current_function;
 
 void FUNCTION_Init(void);
-void FUNCTION_Select(FUNCTION_Type_t Function);
+void FUNCTION_Select(function_type_t Function);
 
 #endif
 

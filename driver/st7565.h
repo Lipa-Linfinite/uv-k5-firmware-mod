@@ -20,17 +20,22 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-extern uint8_t gStatusLine[128];
-extern uint8_t gFrameBuffer[7][128];
+#define LCD_WIDTH       128
+#define LCD_HEIGHT       64
 
-void ST7565_DrawLine(uint8_t Column, uint8_t Line, uint16_t Size, const uint8_t *pBitmap, bool bIsClearMode);
-void ST7565_BlitFullScreen(void);
-void ST7565_BlitStatusLine(void);
-void ST7565_FillScreen(uint8_t Value);
-void ST7565_Init(void);
-void ST7565_HardwareReset(void);
-void ST7565_SelectColumnAndLine(uint8_t Column, uint8_t Line);
-void ST7565_WriteByte(uint8_t Value);
+extern uint8_t g_status_line[128];
+extern uint8_t g_frame_buffer[7][128];
 
+void    ST7565_DrawLine(const unsigned int Column, const unsigned int Line, const unsigned int Size, const uint8_t *pBitmap);
+void    ST7565_BlitFullScreen(void);
+void    ST7565_BlitStatusLine(void);
+void    ST7565_FillScreen(const uint8_t Value);
+void    ST7565_Init(const bool full);
+void    ST7565_HardwareReset(void);
+void    ST7565_SelectColumnAndLine(const uint8_t Column, const uint8_t Line);
+#ifdef ENABLE_CONTRAST
+	void    ST7565_SetContrast(const uint8_t value);
+	uint8_t ST7565_GetContrast(void);
+#endif
 #endif
 

@@ -14,14 +14,15 @@
  *     limitations under the License.
  */
 
-#include <stdbool.h>
 #include "bsp/dp32g030/dma.h"
 #include "bsp/dp32g030/syscon.h"
 #include "bsp/dp32g030/uart.h"
 #include "driver/uart.h"
+#include "external/printf/printf.h"
+#include "misc.h"
 
 static bool UART_IsLogEnabled;
-uint8_t UART_DMA_Buffer[256];
+uint8_t     UART_DMA_Buffer[256];
 
 void UART_Init(void)
 {
@@ -30,21 +31,17 @@ void UART_Init(void)
 	uint32_t Frequency;
 
 	UART1->CTRL = (UART1->CTRL & ~UART_CTRL_UARTEN_MASK) | UART_CTRL_UARTEN_BITS_DISABLE;
-	Delta = SYSCON_RC_FREQ_DELTA;
-	Positive = (Delta & SYSCON_RC_FREQ_DELTA_RCHF_SIG_MASK) >> SYSCON_RC_FREQ_DELTA_RCHF_SIG_SHIFT;
-	Frequency = (Delta & SYSCON_RC_FREQ_DELTA_RCHF_DELTA_MASK) >> SYSCON_RC_FREQ_DELTA_RCHF_DELTA_SHIFT;
-	if (Positive) {
-		Frequency += 48000000U;
-	} else {
-		Frequency = 48000000U - Frequency;
-	}
+	Delta       = SYSCON_RC_FREQ_DELTA;
+	Positive    = (Delta & SYSCON_RC_FREQ_DELTA_RCHF_SIG_MASK) >> SYSCON_RC_FREQ_DELTA_RCHF_SIG_SHIFT;
+	Frequency   = (Delta & SYSCON_RC_FREQ_DELTA_RCHF_DELTA_MASK) >> SYSCON_RC_FREQ_DELTA_RCHF_DELTA_SHIFT;
+	Frequency   = Positive ? Frequency + CPU_CLOCK_HZ : CPU_CLOCK_HZ - Frequency;
 
 	UART1->BAUD = Frequency / 39053U;
 	UART1->CTRL = UART_CTRL_RXEN_BITS_ENABLE | UART_CTRL_TXEN_BITS_ENABLE | UART_CTRL_RXDMAEN_BITS_ENABLE;
 	UART1->RXTO = 4;
-	UART1->FC = 0;
+	UART1->FC   = 0;
 	UART1->FIFO = UART_FIFO_RF_LEVEL_BITS_8_BYTE | UART_FIFO_RF_CLR_BITS_ENABLE | UART_FIFO_TF_CLR_BITS_ENABLE;
-	UART1->IE = 0;
+	UART1->IE   = 0;
 
 	DMA_CTR = (DMA_CTR & ~DMA_CTR_DMAEN_MASK) | DMA_CTR_DMAEN_BITS_DISABLE;
 
@@ -89,17 +86,41 @@ void UART_Send(const void *pBuffer, uint32_t Size)
 	const uint8_t *pData = (const uint8_t *)pBuffer;
 	uint32_t i;
 
-	for (i = 0; i < Size; i++) {
+	for (i = 0; i < Size; i++)
+	{
 		UART1->TDR = pData[i];
-		while ((UART1->IF & UART_IF_TXFIFO_FULL_MASK) != UART_IF_TXFIFO_FULL_BITS_NOT_SET) {
-		}
+		while ((UART1->IF & UART_IF_TXFIFO_FULL_MASK) != UART_IF_TXFIFO_FULL_BITS_NOT_SET) {}
 	}
+}
+
+void UART_SendText(const void *str)
+{
+	if (str)
+		UART_Send(str, strlen(str));
 }
 
 void UART_LogSend(const void *pBuffer, uint32_t Size)
 {
-	if (UART_IsLogEnabled) {
+	if (UART_IsLogEnabled)
 		UART_Send(pBuffer, Size);
-	}
 }
 
+void UART_LogSendText(const void *str)
+{
+	if (UART_IsLogEnabled && str)
+		UART_Send(str, strlen(str));
+}
+
+void UART_printf(const char *str, ...)
+{
+	char text[256];
+	int  len;
+	
+	va_list va;
+	va_start(va, str);
+		len = vsnprintf(text, sizeof(text), str, va);
+	va_end(va);
+
+	UART_Send(text, len);
+	//UART_Send(text, strlen(text));
+}

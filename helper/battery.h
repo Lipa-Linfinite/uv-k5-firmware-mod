@@ -20,23 +20,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-extern uint16_t gBatteryCalibration[6];
-extern uint16_t gBatteryCurrentVoltage;
-extern uint16_t gBatteryCurrent;
-extern uint16_t gBatteryVoltages[4];
-extern uint16_t gBatteryVoltageAverage;
+extern uint16_t          g_usb_current_voltage;
+extern uint16_t          g_usb_current;
+extern uint16_t          g_battery_voltages[4];
+extern uint16_t          g_battery_voltage_average;
+extern uint8_t           g_battery_display_level;
+extern bool              g_charging_with_type_c;
+extern bool              g_low_battery;
+extern bool              g_low_battery_blink;
+extern uint16_t          g_battery_check_counter;
+extern volatile uint16_t g_power_save_tick_10ms;
 
-extern uint8_t gBatteryDisplayLevel;
-
-extern bool gChargingWithTypeC;
-extern bool gLowBattery;
-extern bool gLowBatteryBlink;
-
-extern volatile uint16_t gBatterySave;
-
-extern uint16_t gBatteryCheckCounter;
-
-void BATTERY_GetReadings(bool bDisplayBatteryLevel);
+unsigned int BATTERY_VoltsToPercent(const unsigned int voltage_10mV);
+void         BATTERY_GetReadings(const bool bDisplayBatteryLevel);
 
 #endif
-

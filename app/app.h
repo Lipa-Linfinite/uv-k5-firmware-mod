@@ -18,17 +18,20 @@
 #define APP_APP_H
 
 #include <stdbool.h>
+
 #include "functions.h"
+#include "frequencies.h"
 #include "radio.h"
 
-void APP_EndTransmission(void);
-void CHANNEL_Next(bool bFlag, int8_t Direction);
-void APP_StartListening(FUNCTION_Type_t Function);
-void APP_SetFrequencyByStep(VFO_Info_t *pInfo, int8_t Step);
+void APP_end_tx(void);
+void APP_stop_scan(void);
+void APP_channel_next(const bool remember_current, const scan_state_dir_t scan_direction);
+bool APP_start_listening(void);
+void APP_time_slice_10ms(void);
+void APP_time_slice_500ms(void);
 
-void APP_Update(void);
-void APP_TimeSlice10ms(void);
-void APP_TimeSlice500ms(void);
+void APP_next_freq(void);
+void APP_next_channel(void);
 
 #endif
 

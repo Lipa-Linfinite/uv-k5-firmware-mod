@@ -8,6 +8,7 @@
 :: 
 :: 1. Download and install "gcc-arm-none-eabi-10.3-2021.10-win32.exe" from https://developer.arm.com/downloads/-/gnu-rm
 :: 2. Download and install "gnu_make-3.81.exe" from https://gnuwin32.sourceforge.net/packages/make.htm
+:: 3, If need be (probably not), also download Dependency.zip that includes the library files from https://gnuwin32.sourceforge.net/packages/make.htm
 ::
 :: 3. You may (or may not) need to manualy add a path to you OS environment PATH, ie ..
 ::    C:\Program Files (x86)\GNU Arm Embedded Toolchain\10 2021.10\bin
@@ -18,18 +19,35 @@
 
 
 
+
+
+:: Delete any left over files from previous compile
+::
+del /S /Q *.o >nul 2>nul
+del /S /Q *.d >nul 2>nul
+del /Q firmware >nul 2>nul
+del /Q *.bin >nul 2>nul
+
 :: You may need to edit/change these three paths to suit your setup
 ::
 :: Temporarily add the compiler and make program directories to the system PATH ..
 ::
-@set PATH="C:\Program Files (x86)\GNU Arm Embedded Toolchain\10 2021.10\bin";%PATH%
-@set PATH="C:\Program Files (x86)\GNU Arm Embedded Toolchain\10 2021.10\arm-none-eabi\bin";%PATH%
-@set PATH="C:\Program Files (x86)\GnuWin32\bin\";%PATH%
+@set PATH=C:\Program Files (x86)\GNU Arm Embedded Toolchain\10 2021.10\bin;%PATH%
+@set PATH=C:\Program Files (x86)\GNU Arm Embedded Toolchain\10 2021.10\arm-none-eabi\bin;%PATH%
+@set PATH=C:\Program Files (x86)\GnuWin32\bin;%PATH%
 
 :: Do the compile
 ::
 make clean
 make
+
+:: Delete the spent files
+::
+del /S /Q *.o >nul 2>nul
+del /S /Q *.d >nul 2>nul
+del /Q firmware >nul 2>nul
+
+
 
 
 :: If you have python installed, you can create a 'packed' .bin from the compiled firmware.bin file.

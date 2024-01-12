@@ -20,71 +20,112 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-enum DTMF_State_t {
-	DTMF_STATE_0            = 0U,
-	DTMF_STATE_TX_SUCC      = 1U,
-	DTMF_STATE_CALL_OUT_RSP = 2U,
+#define MAX_DTMF_CONTACTS   16
+
+enum {  // seconds
+	DTMF_HOLD_MIN =  5,
+	DTMF_HOLD_MAX = 60
 };
 
-typedef enum DTMF_State_t DTMF_State_t;
-
-enum DTMF_CallState_t {
-	DTMF_CALL_STATE_NONE     = 0U,
-	DTMF_CALL_STATE_CALL_OUT = 1U,
-	DTMF_CALL_STATE_RECEIVED = 2U,
+enum dtmf_state_e {
+	DTMF_STATE_0 = 0,
+	DTMF_STATE_TX_SUCC,
+	DTMF_STATE_CALL_OUT_RSP
 };
+typedef enum dtmf_state_e dtmf_state_t;
 
-typedef enum DTMF_CallState_t DTMF_CallState_t;
+#ifdef ENABLE_DTMF_CALLING
+	enum dtmf_call_state_e {
+		DTMF_CALL_STATE_NONE = 0,
+		DTMF_CALL_STATE_CALL_OUT,
+		DTMF_CALL_STATE_RECEIVED,
+		DTMF_CALL_STATE_RECEIVED_STAY
+	};
+	typedef enum dtmf_call_state_e dtmf_call_state_t;
+	
+	enum dtmf_decode_response_e {
+		DTMF_DEC_RESPONSE_NONE = 0,
+		DTMF_DEC_RESPONSE_RING,
+		DTMF_DEC_RESPONSE_REPLY,
+		DTMF_DEC_RESPONSE_BOTH
+	};
+	typedef enum dtmf_decode_response_e dtmf_decode_response_t;
+	
+	enum dtmf_reply_state_e {
+		DTMF_REPLY_NONE = 0,
+		DTMF_REPLY_STR,
+		DTMF_REPLY_ANI,
+		DTMF_REPLY_AB,
+		DTMF_REPLY_AAAAA
+	};
+	typedef enum dtmf_reply_state_e dtmf_reply_state_t;
 
-enum DTMF_ReplyState_t {
-	DTMF_REPLY_NONE    = 0U,
-	DTMF_REPLY_ANI     = 1U,
-	DTMF_REPLY_AB      = 2U,
-	DTMF_REPLY_AAAAA   = 3U,
-};
-
-typedef enum DTMF_ReplyState_t DTMF_ReplyState_t;
-
-enum DTMF_CallMode_t {
-	DTMF_CALL_MODE_NOT_GROUP = 0U,
-	DTMF_CALL_MODE_GROUP     = 1U,
-	DTMF_CALL_MODE_DTMF      = 2U,
-};
-
-typedef enum DTMF_CallMode_t DTMF_CallMode_t;
-
-extern char gDTMF_String[15];
-extern char gDTMF_InputBox[15];
-extern char gDTMF_Received[16];
-extern bool gIsDtmfContactValid;
-extern char gDTMF_ID[4];
-extern char gDTMF_Caller[4];
-extern char gDTMF_Callee[4];
-extern DTMF_State_t gDTMF_State;
-extern bool gDTMF_DecodeRing;
-extern uint8_t gDTMF_DecodeRingCountdown;
-extern uint8_t gDTMFChosenContact;
-extern uint8_t gDTMF_WriteIndex;
-extern uint8_t gDTMF_PreviousIndex;
-extern uint8_t gDTMF_AUTO_RESET_TIME;
-extern uint8_t gDTMF_InputIndex;
-extern bool gDTMF_InputMode;
-extern uint8_t gDTMF_RecvTimeout;
-extern DTMF_CallState_t gDTMF_CallState;
-extern DTMF_ReplyState_t gDTMF_ReplyState;
-extern DTMF_CallMode_t gDTMF_CallMode;
-extern bool gDTMF_IsTx;
-extern uint8_t gDTMF_TxStopCountdown;
-
-bool DTMF_ValidateCodes(char *pCode, uint8_t Size);
-bool DTMF_GetContact(uint8_t Index, char *pContact);
-bool DTMF_FindContact(const char *pContact, char *pResult);
-char DTMF_GetCharacter(uint8_t Code);
-bool DTMF_CompareMessage(const char *pDTMF, const char *pTemplate, uint8_t Size, bool bFlag);
-DTMF_CallMode_t DTMF_CheckGroupCall(const char *pDTMF, uint32_t Size);
-void DTMF_Append(char Code);
-void DTMF_HandleRequest(void);
-void DTMF_Reply(void);
-
+	enum dtmf_call_mode_e {
+		DTMF_CALL_MODE_NOT_GROUP = 0,
+		DTMF_CALL_MODE_GROUP,
+		DTMF_CALL_MODE_DTMF
+	};
+	typedef enum dtmf_call_mode_e dtmf_call_mode_t;
+#else
+	enum dtmf_reply_state_e {
+		DTMF_REPLY_NONE = 0,
+		DTMF_REPLY_STR
+	};
+	typedef enum dtmf_reply_state_e dtmf_reply_state_t;
 #endif
 
+extern char               g_dtmf_string[15];
+
+extern char               g_dtmf_input_box[15];
+extern uint8_t            g_dtmf_input_box_index;
+extern bool               g_dtmf_input_mode;
+extern uint8_t            g_dtmf_prev_index;
+
+#ifdef ENABLE_DTMF_LIVE_DECODER
+	extern char               g_dtmf_rx_live[20];
+	extern uint8_t            g_dtmf_rx_live_timeout;
+#endif
+
+#ifdef ENABLE_DTMF_CALLING
+	extern char               g_dtmf_rx[17];
+	extern uint8_t            g_dtmf_rx_index;
+	extern uint8_t            g_dtmf_rx_timeout;
+	extern bool               g_dtmf_rx_pending;
+
+	extern bool               g_dtmf_is_contact_valid;
+	extern char               g_dtmf_id[4];
+	extern char               g_dtmf_caller[4];
+	extern char               g_dtmf_callee[4];
+	extern dtmf_state_t       g_dtmf_state;
+	extern uint8_t            g_dtmf_decode_ring_tick_500ms;
+	extern uint8_t            g_dtmf_chosen_contact;
+	extern uint8_t            g_dtmf_auto_reset_time_500ms;
+	extern dtmf_call_state_t  g_dtmf_call_state;
+	extern dtmf_call_mode_t   g_dtmf_call_mode;
+#endif
+
+extern dtmf_reply_state_t     g_dtmf_reply_state;
+extern bool                   g_dtmf_is_tx;
+extern uint8_t                g_dtmf_tx_stop_tick_500ms;
+
+#ifdef ENABLE_DTMF_CALLING
+	void DTMF_clear_RX(void);
+#endif
+bool DTMF_ValidateCodes(char *pCode, const unsigned int size);
+#ifdef ENABLE_DTMF_CALLING
+	bool DTMF_GetContact(const int Index, char *pContact);
+	bool DTMF_FindContact(const char *pContact, char *pResult);
+#endif
+char DTMF_GetCharacter(const unsigned int code);
+#ifdef ENABLE_DTMF_CALLING
+	bool DTMF_CompareMessage(const char *pDTMF, const char *pTemplate, const unsigned int size, const bool flag);
+	dtmf_call_mode_t DTMF_CheckGroupCall(const char *pDTMF, const unsigned int size);
+#endif
+void DTMF_clear_input_box(void);
+void DTMF_Append(const char vode);
+#ifdef ENABLE_DTMF_CALLING
+	void DTMF_HandleRequest(void);
+#endif
+bool DTMF_Reply(void);
+
+#endif

@@ -17,6 +17,27 @@
 #ifndef UI_MAIN_H
 #define UI_MAIN_H
 
+enum center_line_e {
+	CENTER_LINE_NONE = 0,
+	CENTER_LINE_IN_USE,
+	CENTER_LINE_AUDIO_BAR,
+	CENTER_LINE_RSSI,
+	CENTER_LINE_AM_FIX_DATA,
+	CENTER_LINE_DTMF_DEC,
+	CENTER_LINE_CHARGE_DATA,
+	CENTER_LINE_MDC1200
+};
+typedef enum center_line_e center_line_t;
+
+extern center_line_t g_center_line;
+
+#ifdef ENABLE_TX_AUDIO_BAR
+	bool UI_DisplayAudioBar(const bool now);
+#endif
+void UI_update_rssi(const int rssi, const unsigned int glitch, const unsigned int noise, const unsigned int vfo);
+#ifdef ENABLE_PANADAPTER
+	void UI_DisplayMain_pan(const bool now);
+#endif
 void UI_DisplayMain(void);
 
 #endif

@@ -20,77 +20,220 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-enum {
-	MENU_SQL		= 0,
+#include "audio.h"     // voice_id_t
+
+typedef struct {
+	const char name[7];    // menu display area only has room for 6 characters
+	voice_id_t voice_id;
+	uint8_t    menu_id;
+} t_menu_item;
+
+// currently this list MUST be in exactly the same order
+// as the other menu list "g_menu_list[]" in "ui/menu.c", otherwise
+// you'll have big problems
+//
+// I'm going to fix that so that you can reorder the menu items
+// anyway you like simply by editing this list only (the other list
+// you just leave as is, or any which way, it won't matter)
+//
+enum
+{
+	// ************************************
+
+	MENU_SQL = 0,
+	MENU_CHAN_SQL,
 	MENU_STEP,
-	MENU_TXP,
-	MENU_R_DCS,
-	MENU_R_CTCS,
-	MENU_T_DCS,
-	MENU_T_CTCS,
-	MENU_SFT_D,
+	MENU_BANDWIDTH,
+	MENU_TX_POWER,
+//	MENU_TX_POWER_USER,
+	MENU_RX_CDCSS,
+	MENU_RX_CTCSS,
+	MENU_TX_CDCSS,
+	MENU_TX_CTCSS,
+	MENU_SHIFT_DIR,
 	MENU_OFFSET,
-	MENU_W_N,
-	MENU_SCR,
-	MENU_BCL,
-	MENU_MEM_CH,
-	MENU_SAVE,
+	MENU_TX_TO,
+	MENU_CROSS_VFO,
+	MENU_DUAL_WATCH,
+	MENU_SCAN_CAR_RESUME,
+	MENU_SCAN_HOLD,
+	MENU_SCRAMBLER,
+	MENU_BUSY_CHAN_LOCK,
+	MENU_MEM_SAVE,
+	MENU_MEM_NAME,
+	MENU_MEM_DEL,
+	MENU_MEM_DISP,
+	MENU_BAT_SAVE,
+#ifdef ENABLE_VOX
 	MENU_VOX,
-	MENU_ABR,
-	MENU_TDR,
-	MENU_WX,
-	MENU_BEEP,
-	MENU_TOT,
-	MENU_VOICE,
-	MENU_SC_REV,
-	MENU_MDF,
-	MENU_AUTOLK,
+#endif
+	MENU_AUTO_BACKLITE,
+	MENU_AUTO_BACKLITE_ON_TX_RX,
+#ifdef ENABLE_CONTRAST
+	MENU_CONTRAST,
+#endif
+#ifdef ENABLE_SCAN_RANGES
+	MENU_SCAN_RANGES,
+#endif
 	MENU_S_ADD1,
 	MENU_S_ADD2,
+#ifdef ENABLE_NOAA
+	MENU_NOAA_SCAN,
+#endif
+	MENU_1_CALL,
 	MENU_STE,
 	MENU_RP_STE,
-	MENU_MIC,
-	MENU_1_CALL,
+	MENU_MIC_GAIN,
+	MENU_COMPAND,
+#ifdef ENABLE_PANADAPTER
+	MENU_PANADAPTER,
+#endif
+#ifdef ENABLE_TX_AUDIO_BAR
+	MENU_TX_BAR,
+#endif
+	MENU_RX_BAR,
 	MENU_S_LIST,
 	MENU_SLIST1,
 	MENU_SLIST2,
-#if defined(ENABLE_ALARM)
-	MENU_AL_MOD,
-#endif
+#ifdef ENABLE_DTMF_CALLING
 	MENU_ANI_ID,
-	MENU_UPCODE,
-	MENU_DWCODE,
-	MENU_D_ST,
-	MENU_D_RSP,
-	MENU_D_HOLD,
-	MENU_D_PRE,
-	MENU_PTT_ID,
-	MENU_D_DCD,
-	MENU_D_LIST,
-	MENU_PONMSG,
-	MENU_ROGER,
-	MENU_VOL,
-	MENU_AM,
-#if defined(ENABLE_NOAA)
-	MENU_NOAA_S,
 #endif
-	MENU_DEL_CH,
+	MENU_UP_CODE,
+	MENU_DN_CODE,
+	MENU_DTMF_ST,
+#ifdef ENABLE_DTMF_CALLING
+	MENU_DTMF_HOLD,
+	MENU_DTMF_LIST,
+	MENU_DTMF_RSP,
+	MENU_DTMF_DCD,
+#endif
+#ifdef ENABLE_DTMF_LIVE_DECODER
+	MENU_DTMF_LIVE_DEC,
+#endif
+#ifdef ENABLE_DTMF_TIMING_SETTINGS
+	MENU_DTMF_PRE,
+	MENU_DTMF_1ST_PERSIST,
+	MENU_DTMF_HASH_PERSIST,
+	MENU_DTMF_PERSIST,
+	MENU_DTMF_INTERVAL,
+#endif
+#ifdef ENABLE_MDC1200
+	MENU_MDC1200_MODE,
+	MENU_MDC1200_ID,
+#endif
+	MENU_PTT_ID,
+	MENU_ROGER_MODE,
+#ifdef ENABLE_ALARM
+	MENU_ALARM_MODE,
+#endif
+	MENU_PON_MSG,
+	MENU_VOLTAGE,
+	MENU_BAT_TXT,
+	MENU_MOD_MODE,
+#ifdef ENABLE_AM_FIX
+//	MENU_AM_FIX,
+#endif
+#ifdef ENABLE_AM_FIX_TEST1
+	MENU_AM_FIX_TEST1,
+#endif
+	MENU_BEEP,
+#ifdef ENABLE_VOICE
+	MENU_VOICE,
+#endif
+#ifdef ENABLE_KEYLOCK
+	MENU_AUTO_KEY_LOCK,
+#endif
+#ifdef ENABLE_SIDE_BUTT_MENU
+	MENU_SIDE1_SHORT,
+	MENU_SIDE1_LONG,
+	MENU_SIDE2_SHORT,
+	MENU_SIDE2_LONG,
+#endif
+	MENU_VERSION,
 	MENU_RESET,
-	MENU_350TX,
-	MENU_F_LOCK,
-	MENU_200TX,
-	MENU_500TX,
-	MENU_350EN,
-	MENU_SCREN,
+
+	// ************************************
+	// ************************************
+	// ************************************
+	// items after here are normally hidden
+
+	MENU_BAT_CAL,      // battery voltage calibration
+
+#ifdef ENABLE_TX_POWER_CAL_MENU
+	MENU_TX_CALI,      // L/M/H TX power calibration
+#endif
+
+#ifdef ENABLE_FM_DEV_CAL_MENU
+	MENU_TX_FM_DEV_CAL,  // FM deviation calibration
+#endif
+
+#ifdef ENABLE_F_CAL_MENU
+	MENU_F_CALI,       // 26MHz reference xtal calibration
+#endif
+
+	MENU_SCRAMBLER_EN, // scrambler enable/disable
+	MENU_FREQ_LOCK,    // lock to a selected region
+	MENU_350_EN,       // 350~400MHz enable/disable
+	MENU_174_TX,       // 174~350MHz TX enable/disable
+	MENU_350_TX,       // 350~400MHz TX enable/disable
+	MENU_470_TX,       // 470MHz and up TX enable/disable
+	MENU_TX_EN,        // disable the TX entirely
+
+	// ************************************
+	// ************************************
+	// ************************************
 };
 
-extern bool gIsInSubMenu;
+extern const t_menu_item  g_menu_list[];
+extern uint8_t            g_menu_list_sorted[];
 
-extern uint8_t gMenuCursor;
-extern int8_t gMenuScrollDirection;
-extern uint32_t gSubMenuSelection;
+extern const char         g_sub_menu_mod_mode[3][4];
+extern const char         g_sub_menu_tx_power[4][5];
+extern const char         g_sub_menu_shift_dir[3][4];
+extern const char         g_sub_menu_bandwidth[2][7];
+extern const char         g_sub_menu_off_on[2][4];
+extern const char         g_sub_menu_bat_save[5][9];
+extern const char         g_sub_menu_dual_watch[3][10];
+extern const char         g_sub_menu_cross_vfo[3][10];
+#ifdef ENABLE_VOICE
+	extern const char     g_sub_menu_voice[3][4];
+#endif
+extern const char         g_sub_menu_scan_car_resume[3][8];
+extern const char         g_sub_menu_mem_disp[4][12];
+#ifdef ENABLE_ALARM
+	extern const char     g_sub_menu_alarm_mode[2][5];
+#endif
+#ifdef ENABLE_DTMF_CALLING
+	extern const char     g_sub_menu_dtmf_rsp[4][9];
+#endif
+extern const char         g_sub_menu_ptt_id[6][17];
+#ifdef ENABLE_MDC1200
+	extern const char     g_sub_menu_mdc1200_mode[4][5];
+#endif
+extern const char         g_sub_menu_pwr_on_msg[4][11];
+extern const char         g_sub_menu_roger_mode[3][8];
+extern const char         g_sub_menu_reset[2][4];
+extern const char         g_sub_menu_backlight[8][7];
+extern const char         g_sub_menu_rx_tx[4][6];
+#ifdef ENABLE_AM_FIX_TEST1
+	extern const char     g_sub_menu_AM_FIX_test1[4][8];
+#endif
+extern const char         g_sub_menu_bat_text[3][8];
+#ifdef ENABLE_SIDE_BUTT_MENU
+	extern const char     g_sub_menu_side_butt[9][16];
+#endif
 
+extern bool               g_in_sub_menu;
+
+extern uint8_t            g_menu_cursor;
+extern int8_t             g_menu_scroll_direction;
+extern int32_t            g_sub_menu_selection;
+
+extern char               g_edit_original[17];
+extern char               g_edit[17];
+extern int                g_edit_index;
+
+void UI_SortMenu(const bool hide_hidden);
 void UI_DisplayMenu(void);
 
 #endif
-

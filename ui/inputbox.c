@@ -14,19 +14,45 @@
  *     limitations under the License.
  */
 
-#include <string.h>
+#include "misc.h"
 #include "ui/inputbox.h"
 
-char gInputBox[8];
-uint8_t gInputBoxIndex;
+unsigned int g_input_box_index;
+char         g_input_box[8];
 
-void INPUTBOX_Append(char Digit)
+uint32_t INPUTBOX_value(void)
 {
-	if (gInputBoxIndex == 0) {
-		memset(gInputBox, 10, sizeof(gInputBox));
-	} else if (gInputBoxIndex >= sizeof(gInputBox)) {
-		return;
+	int i = g_input_box_index;
+	if (i > (int)ARRAY_SIZE(g_input_box))
+		i = ARRAY_SIZE(g_input_box);
+
+	uint32_t val = 0;
+	uint32_t mul = 1;
+	while (--i >= 0)
+	{
+		if (g_input_box[i] < 10)
+		{
+			val += (uint32_t)g_input_box[i] * mul;
+			mul *= 10;
+		}
 	}
-	gInputBox[gInputBoxIndex++] = Digit;
+
+	return val;
 }
 
+void INPUTBOX_append(const key_code_t Digit)
+{
+	if (g_input_box_index >= sizeof(g_input_box))
+		return;
+
+	if (g_input_box_index == 0)
+		memset(g_input_box, 10, sizeof(g_input_box));
+
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wtype-limits"
+
+	if (Digit >= KEY_0 && Digit != KEY_INVALID)
+		g_input_box[g_input_box_index++] = (char)(Digit - KEY_0);
+
+	#pragma GCC diagnostic pop
+}

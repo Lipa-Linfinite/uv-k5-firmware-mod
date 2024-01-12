@@ -14,74 +14,223 @@
  *     limitations under the License.
  */
 
-#include <string.h>
-#if defined(ENABLE_FMRADIO)
-#include "app/fm.h"
+#include "app/search.h"
+#ifdef ENABLE_FMRADIO
+	#include "app/fm.h"
 #endif
 #include "bitmaps.h"
 #include "driver/keyboard.h"
 #include "driver/st7565.h"
+#include "app/dtmf.h"
+#include "external/printf/printf.h"
 #include "functions.h"
 #include "helper/battery.h"
 #include "misc.h"
 #include "settings.h"
+#include "ui/battery.h"
+#include "ui/helper.h"
+#include "ui/ui.h"
 #include "ui/status.h"
 
-void UI_DisplayStatus(void)
+void UI_DisplayStatus(const bool test_display)
 {
-	memset(gStatusLine, 0, sizeof(gStatusLine));
-	if (gCurrentFunction == FUNCTION_POWER_SAVE) {
-		memcpy(gStatusLine, BITMAP_PowerSave, sizeof(BITMAP_PowerSave));
-	}
-	if (gBatteryDisplayLevel < 2) {
-		if (gLowBatteryBlink == 1) {
-			memcpy(gStatusLine + 110, BITMAP_BatteryLevel1, sizeof(BITMAP_BatteryLevel1));
+	uint8_t     *line = g_status_line;
+	unsigned int x    = 0;
+
+	g_update_status = false;
+
+	memset(g_status_line, 0, sizeof(g_status_line));
+
+	// POWER-SAVE indicator
+	if (g_current_function == FUNCTION_POWER_SAVE || test_display)
+		memcpy(line + x, BITMAP_POWERSAVE, sizeof(BITMAP_POWERSAVE));
+	else
+#if 0
+	if (g_current_function == FUNCTION_TRANSMIT)
+		memcpy(line + x, BITMAP_TX, sizeof(BITMAP_TX));
+	else
+	if (g_current_function == FUNCTION_RECEIVE || g_current_function == FUNCTION_NEW_RECEIVE || g_monitor_enabled)
+		memcpy(line + x, BITMAP_RX, sizeof(BITMAP_RX));
+#endif
+	x += sizeof(BITMAP_POWERSAVE) + 1;
+
+	#ifdef ENABLE_NOAA
+		// NOAA scan indicator
+		if (g_noaa_mode || test_display)
+		{
+			memcpy(line + x, BITMAP_NOAA, sizeof(BITMAP_NOAA));
+			x += sizeof(BITMAP_NOAA) + 1;
 		}
-	} else {
-		if (gBatteryDisplayLevel == 2) {
-			memcpy(gStatusLine + 110, BITMAP_BatteryLevel2, sizeof(BITMAP_BatteryLevel2));
-		} else if (gBatteryDisplayLevel == 3) {
-			memcpy(gStatusLine + 110, BITMAP_BatteryLevel3, sizeof(BITMAP_BatteryLevel3));
-		} else if (gBatteryDisplayLevel == 4) {
-			memcpy(gStatusLine + 110, BITMAP_BatteryLevel4, sizeof(BITMAP_BatteryLevel4));
-		} else {
-			memcpy(gStatusLine + 110, BITMAP_BatteryLevel5, sizeof(BITMAP_BatteryLevel5));
+	#endif
+
+	#ifdef ENABLE_DTMF_KILL_REVIVE
+		if (g_eeprom.config.setting.radio_disabled)
+		{
+			memset(line + x, 0xFF, 10);
+			x += 10;
 		}
-	}
-	if (gChargingWithTypeC) {
-		memcpy(gStatusLine + 100, BITMAP_USB_C, sizeof(BITMAP_USB_C));
-	}
-	if (gEeprom.KEY_LOCK) {
-		memcpy(gStatusLine + 90, BITMAP_KeyLock, sizeof(BITMAP_KeyLock));
-	} else if (gWasFKeyPressed) {
-		memcpy(gStatusLine + 90, BITMAP_F_Key, sizeof(BITMAP_F_Key));
+	#endif
+
+	#ifdef ENABLE_FMRADIO
+		// FM indicator
+		if (g_fm_radio_mode || test_display)
+		{
+			memcpy(line + x, BITMAP_FM, sizeof(BITMAP_FM));
+			x += sizeof(BITMAP_FM) + 1;
+		}
+	#endif
+
+	// SCAN indicator
+	if (g_scan_state_dir != SCAN_STATE_DIR_OFF || test_display)
+	{
+		// don't display this if in search mode
+		if (g_current_display_screen != DISPLAY_SEARCH)
+		{
+			if (g_scan_next_channel <= USER_CHANNEL_LAST)
+			{	// channel mode
+				if (g_eeprom.config.setting.scan_list_default == 0)
+					UI_PrintStringSmallBuffer("1", line + x);
+				else
+				if (g_eeprom.config.setting.scan_list_default == 1)
+					UI_PrintStringSmallBuffer("2", line + x);
+				else
+				if (g_eeprom.config.setting.scan_list_default == 2)
+					UI_PrintStringSmallBuffer("*", line + x);
+			}
+			else
+			{	// frequency mode
+				UI_PrintStringSmallBuffer("S", line + x);
+			}
+		}
+		x += 7 + 1;  // font character width + 1
 	}
 
-	if (gEeprom.VOX_SWITCH) {
-		memcpy(gStatusLine + 71, BITMAP_VOX, sizeof(BITMAP_VOX));
+	#ifdef ENABLE_VOICE
+		// VOICE indicator
+		if (g_eeprom.config.setting.voice_prompt != VOICE_PROMPT_OFF || test_display)
+		{
+			memcpy(line + x, BITMAP_VOICE_PROMPT, sizeof(BITMAP_VOICE_PROMPT));
+			x += sizeof(BITMAP_VOICE_PROMPT) + 1;
+		}
+	#endif
+
+	// DUAL-WATCH indicator
+	if (g_eeprom.config.setting.dual_watch != DUAL_WATCH_OFF || test_display)
+	{
+		bool dw_running = true;
+
+		#ifdef ENABLE_FMRADIO
+			if (g_fm_radio_mode && g_current_display_screen == DISPLAY_FM)
+				dw_running = false;
+			else
+		#endif
+
+		if (g_dual_watch_tick_10ms > dual_watch_delay_toggle_10ms ||
+			#ifdef ENABLE_DTMF_CALLING
+				g_dtmf_call_state != DTMF_CALL_STATE_NONE ||
+			#endif
+			g_scan_state_dir != SCAN_STATE_DIR_OFF  ||
+			g_css_scan_mode != CSS_SCAN_MODE_OFF    ||
+			(g_current_function != FUNCTION_FOREGROUND && g_current_function != FUNCTION_POWER_SAVE) ||
+			g_current_display_screen == DISPLAY_SEARCH)
+		{
+			dw_running = false;
+		}
+
+		if (dw_running)
+			memcpy(line + x, BITMAP_TDR_RUNNING, sizeof(BITMAP_TDR_RUNNING));
+		else
+			memcpy(line + x, BITMAP_TDR_HOLDING, sizeof(BITMAP_TDR_HOLDING));
+		x += sizeof(BITMAP_TDR_RUNNING) + 1;
 	}
-	if (gEeprom.CROSS_BAND_RX_TX != CROSS_BAND_OFF) {
-		memcpy(gStatusLine + 58, BITMAP_WX, sizeof(BITMAP_WX));
+
+	// monitor
+	if (g_monitor_enabled)
+	{
+		memcpy(line + x, BITMAP_MONITOR, sizeof(BITMAP_MONITOR));
+		x += sizeof(BITMAP_MONITOR) + 1;
 	}
-	if (gEeprom.DUAL_WATCH != DUAL_WATCH_OFF) {
-		memcpy(gStatusLine + 45, BITMAP_TDR, sizeof(BITMAP_TDR));
+
+	// CROSS-VFO indicator
+	if (g_eeprom.config.setting.cross_vfo != CROSS_BAND_OFF || test_display)
+	{
+		memcpy(line + x, BITMAP_XB, sizeof(BITMAP_XB));
+		x += sizeof(BITMAP_XB) + 1;
 	}
-	if (gEeprom.VOICE_PROMPT != VOICE_PROMPT_OFF) {
-		memcpy(gStatusLine + 34, BITMAP_VoicePrompt, sizeof(BITMAP_VoicePrompt));
+
+	#ifdef ENABLE_VOX
+		// VOX indicator
+		if (g_eeprom.config.setting.vox_enabled || test_display)
+		{
+			memcpy(line + x, g_vox_audio_detected ? BITMAP_VOX : BITMAP_VOX_SMALL, sizeof(BITMAP_VOX));
+//			if (g_vox_audio_detected)
+//				invert_pixels(line + x, sizeof(BITMAP_VOX));
+			x += sizeof(BITMAP_VOX) + 1;
+		}
+	#endif
+
+	#ifdef ENABLE_KEYLOCK
+	// KEY-LOCK indicator
+	if (g_eeprom.config.setting.key_lock || test_display)
+	{
+		memcpy(line + x, BITMAP_KEYLOCK, sizeof(BITMAP_KEYLOCK));
+		x += sizeof(BITMAP_KEYLOCK) + 1;
 	}
-	if (gSetting_KILLED) {
-		memset(gStatusLine + 21, 0xFF, 10);
+	else
+	#endif
+	if (g_fkey_pressed)
+	{
+		memcpy(line + x, BITMAP_F_KEY, sizeof(BITMAP_F_KEY));
+		x += sizeof(BITMAP_F_KEY);
 	}
-#if defined(ENABLE_FMRADIO)
-	else if (gFmRadioMode) {
-		memcpy(gStatusLine + 21, BITMAP_FM, sizeof(BITMAP_FM));
+	x++;
+
+	{	// battery voltage or percentage text
+		char         s[8];
+		unsigned int space_needed;
+
+		unsigned int x2 = LCD_WIDTH - sizeof(BITMAP_BATTERY_LEVEL) - 3;
+
+		if (g_charging_with_type_c)
+			x2 -= sizeof(BITMAP_USB_C);  // the radio is on USB charge
+
+		switch (g_eeprom.config.setting.battery_text)
+		{
+			default:
+			case 0:
+				break;
+
+			case 1:		// voltage
+			{
+				const uint16_t voltage = (g_battery_voltage_average <= 999) ? g_battery_voltage_average : 999; // limit to 9.99V
+				sprintf(s, "%u.%02uV", voltage / 100, voltage % 100);
+				space_needed = (7 * strlen(s));
+				if (x2 >= (x + space_needed))
+					UI_PrintStringSmallBuffer(s, line + x2 - space_needed);
+				break;
+			}
+
+			case 2:		// percentage
+			{
+				sprintf(s, "%u%%", BATTERY_VoltsToPercent(g_battery_voltage_average));
+				space_needed = (7 * strlen(s));
+				if (x2 >= (x + space_needed))
+					UI_PrintStringSmallBuffer(s, line + x2 - space_needed);
+				break;
+			}
+		}
 	}
-#endif
-#if defined(ENABLE_NOAA)
-	if (gIsNoaaMode) {
-		memcpy(gStatusLine + 7, BITMAP_NOAA, sizeof(BITMAP_NOAA));
-	}
-#endif
+
+	// move to right side of the screen
+	x = LCD_WIDTH - sizeof(BITMAP_BATTERY_LEVEL) - sizeof(BITMAP_USB_C);
+
+	// USB-C charge indicator
+	if (g_charging_with_type_c || test_display)
+		memcpy(line + x, BITMAP_USB_C, sizeof(BITMAP_USB_C));
+	x += sizeof(BITMAP_USB_C);
+
+	// BATTERY LEVEL indicator
+	UI_DrawBattery(line + x, g_battery_display_level, g_low_battery_blink);
+
 	ST7565_BlitStatusLine();
 }
-

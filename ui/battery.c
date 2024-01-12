@@ -15,39 +15,45 @@
  */
 
 #include <stddef.h>
+#include <string.h>
+
 #include "bitmaps.h"
 #include "driver/st7565.h"
 #include "functions.h"
 #include "ui/battery.h"
 
-void UI_DisplayBattery(uint8_t Level)
+void UI_DrawBattery(uint8_t *bitmap, const unsigned int level, const unsigned int blink)
 {
-	const uint8_t *pBitmap;
-	bool bClearMode = false;
-
-	if (gCurrentFunction != 1) {
-		switch (Level) {
-		case 0:
-			pBitmap = NULL;
-			bClearMode = true;
-			break;
-		case 1:
-			pBitmap = BITMAP_BatteryLevel1;
-			break;
-		case 2:
-			pBitmap = BITMAP_BatteryLevel2;
-			break;
-		case 3:
-			pBitmap = BITMAP_BatteryLevel3;
-			break;
-		case 4:
-			pBitmap = BITMAP_BatteryLevel4;
-			break;
-		default:
-			pBitmap = BITMAP_BatteryLevel5;
-			break;
+	if (blink == 1)
+	{
+		memset(bitmap, 0, sizeof(BITMAP_BATTERY_LEVEL));
+	}
+	else 
+	{
+		memcpy(bitmap, BITMAP_BATTERY_LEVEL, sizeof(BITMAP_BATTERY_LEVEL));
+		if (level > 1)
+		{
+			unsigned int i;
+			unsigned int bars = level - 1;
+			if (bars > 4)
+				bars = 4;
+			for (i = 0; i < bars; i++)
+			{
+				#ifdef ENABLE_REVERSE_BAT_SYMBOL
+					bitmap[3 + (i * 3) + 0] = __extension__ 0b01011101;
+					bitmap[3 + (i * 3) + 1] = __extension__ 0b01011101;
+				#else
+					bitmap[sizeof(BITMAP_BATTERY_LEVEL) - 3 - (i * 3) - 0] = __extension__ 0b01011101;
+					bitmap[sizeof(BITMAP_BATTERY_LEVEL) - 3 - (i * 3) - 1] = __extension__ 0b01011101;
+				#endif
+			}
 		}
-		ST7565_DrawLine(110, 0, 18, pBitmap, bClearMode);
 	}
 }
 
+void UI_DisplayBattery(const unsigned int level, const unsigned int blink)
+{
+	uint8_t bitmap[sizeof(BITMAP_BATTERY_LEVEL)];
+	UI_DrawBattery(bitmap, level, blink);
+	ST7565_DrawLine(LCD_WIDTH - sizeof(bitmap), 0, sizeof(bitmap), bitmap);
+}
