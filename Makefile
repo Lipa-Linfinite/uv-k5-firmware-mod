@@ -1,6 +1,6 @@
 TARGET = firmware
 
-ENABLE_AIRCOPY := 1
+ENABLE_AIRCOPY := 0
 ENABLE_ALARM := 1
 ENABLE_FMRADIO := 1
 ENABLE_NOAA := 1
@@ -100,6 +100,7 @@ OBJS += ui/welcome.o
 OBJS += version.o
 
 OBJS += main.o
+
 ifeq ($(OS), Windows_NT) # windows
     TOP := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
     RM = del /Q
@@ -201,4 +202,5 @@ bsp/dp32g030/%.h: hardware/dp32g030/%.def
 clean:
 	$(RM) $(call FixPath, $(TARGET).bin $(TARGET).packed.bin $(TARGET) $(OBJS) $(DEPS))
 
-
+doxygen:
+	doxygen

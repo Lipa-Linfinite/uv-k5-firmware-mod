@@ -1,2 +1,2 @@
-const char Version[] = "LOEFW-" GIT_HASH;
+const char Version[] = "OEFW-" GIT_HASH;
 
