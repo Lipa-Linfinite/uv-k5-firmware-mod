@@ -5,3 +5,4 @@ link-overlay.S
 sram-overlay
 sram-overlay.bin
 
+firmware
