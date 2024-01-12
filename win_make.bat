@@ -1,8 +1,4 @@
-
 @echo off
-
-
-
 
 :: Compile directly in windows without the need of a linux virtual machine:
 :: 
@@ -15,7 +11,6 @@
 :: 4. You may (or may not) need to reboot windows after installing the above
 :: 
 :: You can then run this bat from the directory you saved the firmware source code too.
-
 
 
 :: You may need to edit/change these three paths to suit your setup
@@ -31,7 +26,6 @@
 make clean
 make
 
-
 :: If you have python installed, you can create a 'packed' .bin from the compiled firmware.bin file.
 :: The Quansheng windows upload-to-radio program requires a 'packed' .bin file.
 ::
@@ -41,22 +35,15 @@ make
 :: I wrote a GUI version of k5prog to do this easily in windows ..
 ::    https://github.com/OneOfEleven/k5prog-win
 
-
-
 :: One of these two lines simply install the required python module if you want to create the packed
 :: firmware bin file, either only needs running once, ever.
 ::
 ::python  -m pip install --upgrade pip crcmod
 ::python3 -m pip install --upgrade pip crcmod
 
-
-
 :: show the compiled .bin file size
 ::
 ::arm-none-eabi-size firmware
 
-
-
-
-pause
+::pause
 @echo on
