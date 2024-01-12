@@ -100,11 +100,18 @@ OBJS += ui/welcome.o
 OBJS += version.o
 
 OBJS += main.o
-
-ifeq ($(OS),Windows_NT)
-TOP := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-else
-TOP := $(shell pwd)
+ifeq ($(OS), Windows_NT) # windows
+    TOP := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+    RM = del /Q
+    FixPath = $(subst /,\,$1)
+    WHERE = where
+    NULL_OUTPUT = nul
+else # unix
+    TOP := $(shell pwd)
+    RM = rm -f
+    FixPath = $1
+    WHERE = which
+    NULL_OUTPUT = /dev/null
 endif
 
 AS = arm-none-eabi-gcc
@@ -166,7 +173,6 @@ DEPS = $(OBJS:.o=.d)
 all: $(TARGET)
 	$(OBJCOPY) -O binary $< $<.bin
 	-python fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
-	-python3 fw-pack.py $<.bin $(GIT_HASH) $<.packed.bin
 	$(SIZE) $<
 
 debug:
@@ -193,5 +199,6 @@ bsp/dp32g030/%.h: hardware/dp32g030/%.def
 -include $(DEPS)
 
 clean:
-	rm -f $(TARGET).bin $(TARGET).packed.bin $(TARGET) $(OBJS) $(DEPS)
+	$(RM) $(call FixPath, $(TARGET).bin $(TARGET).packed.bin $(TARGET) $(OBJS) $(DEPS))
+
 
