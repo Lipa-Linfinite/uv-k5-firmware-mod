@@ -1,0 +1,46 @@
+app/app.o: app/app.c C:/projects/dualtachyon/uv-k5-firmware/app/action.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/keyboard.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/aircopy.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/app.h \
+ C:/projects/dualtachyon/uv-k5-firmware/functions.h \
+ C:/projects/dualtachyon/uv-k5-firmware/radio.h \
+ C:/projects/dualtachyon/uv-k5-firmware/dcs.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/dtmf.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/fm.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/generic.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/main.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/menu.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/scanner.h \
+ C:/projects/dualtachyon/uv-k5-firmware/dcs.h \
+ C:/projects/dualtachyon/uv-k5-firmware/app/uart.h \
+ c:\projects\dualtachyon\uv-k5-firmware\external\cmsis_5\device\arm\armcm0\include\armcm0.h \
+ c:\projects\dualtachyon\uv-k5-firmware\external\cmsis_5\cmsis\core\include\core_cm0.h \
+ c:\projects\dualtachyon\uv-k5-firmware\external\cmsis_5\cmsis\core\include\cmsis_version.h \
+ c:\projects\dualtachyon\uv-k5-firmware\external\cmsis_5\cmsis\core\include\cmsis_compiler.h \
+ c:\projects\dualtachyon\uv-k5-firmware\external\cmsis_5\cmsis\core\include\cmsis_gcc.h \
+ c:\projects\dualtachyon\uv-k5-firmware\external\cmsis_5\device\arm\armcm0\include\system_ARMCM0.h \
+ C:/projects/dualtachyon/uv-k5-firmware/audio.h \
+ C:/projects/dualtachyon/uv-k5-firmware/board.h \
+ C:/projects/dualtachyon/uv-k5-firmware/bsp/dp32g030/gpio.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/backlight.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/bk1080.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/bk1080-regs.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/bk4819.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/bk4819-regs.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/gpio.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/st7565.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/system.h app/dtmf.h \
+ C:/projects/dualtachyon/uv-k5-firmware/frequencies.h \
+ C:/projects/dualtachyon/uv-k5-firmware/radio.h \
+ C:/projects/dualtachyon/uv-k5-firmware/helper/battery.h \
+ C:/projects/dualtachyon/uv-k5-firmware/misc.h \
+ C:/projects/dualtachyon/uv-k5-firmware/settings.h \
+ C:/projects/dualtachyon/uv-k5-firmware/sram-overlay.h \
+ C:/projects/dualtachyon/uv-k5-firmware/driver/flash.h \
+ C:/projects/dualtachyon/uv-k5-firmware/bsp/dp32g030/flash.h \
+ C:/projects/dualtachyon/uv-k5-firmware/ui/battery.h \
+ C:/projects/dualtachyon/uv-k5-firmware/ui/inputbox.h \
+ C:/projects/dualtachyon/uv-k5-firmware/ui/menu.h \
+ C:/projects/dualtachyon/uv-k5-firmware/ui/rssi.h \
+ C:/projects/dualtachyon/uv-k5-firmware/ui/status.h \
+ C:/projects/dualtachyon/uv-k5-firmware/ui/ui.h
