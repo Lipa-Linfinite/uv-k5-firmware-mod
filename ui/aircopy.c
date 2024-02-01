@@ -14,7 +14,10 @@
  *     limitations under the License.
  */
 
+#ifdef ENABLE_AIRCOPY
+
 #include <string.h>
+
 #include "app/aircopy.h"
 #include "driver/st7565.h"
 #include "external/printf/printf.h"
@@ -23,38 +26,50 @@
 #include "ui/aircopy.h"
 #include "ui/helper.h"
 #include "ui/inputbox.h"
+#ifdef ENABLE_DOCK
+	#include "app/uart.h"
+#endif
 
 void UI_DisplayAircopy(void)
 {
-	char String[16];
+	char String[16] = { 0 };
+	char *pPrintStr = { 0 };
 
-	memset(gFrameBuffer, 0, sizeof(gFrameBuffer));
+	UI_DisplayClear();
 
 	if (gAircopyState == AIRCOPY_READY) {
-		strcpy(String, "AIR COPY(RDY)");
+		pPrintStr = "AIR COPY(RDY)";
 	} else if (gAircopyState == AIRCOPY_TRANSFER) {
-		strcpy(String, "AIR COPY");
+		pPrintStr = "AIR COPY";
 	} else {
-		strcpy(String, "AIR COPY(CMP)");
+		pPrintStr = "AIR COPY(CMP)";
 	}
-	UI_PrintString(String, 2, 127, 0, 8, true);
+
+	UI_PrintString(pPrintStr, 2, 127, 0, 8);
 
 	if (gInputBoxIndex == 0) {
-		NUMBER_ToDigits(gRxVfo->ConfigRX.Frequency, String);
-		UI_DisplayFrequency(String, 16, 2, 0, 0);
-		UI_DisplaySmallDigits(2, String + 6, 97, 3);
+		uint32_t frequency = gRxVfo->freq_config_RX.Frequency;
+		sprintf(String, "%3u.%05u", frequency / 100000, frequency % 100000);
+		// show the remaining 2 small frequency digits
+		UI_PrintStringSmallNormal(String + 7, 97, 0, 3);
+		String[7] = 0;
+		// show the main large frequency digits
+		UI_DisplayFrequency(String, 16, 2, false);
 	} else {
-		UI_DisplayFrequency(gInputBox, 16, 2, 1, 0);
+		const char *ascii = INPUTBOX_GetAscii();
+		sprintf(String, "%.3s.%.3s", ascii, ascii + 3);
+		UI_DisplayFrequency(String, 16, 2, false);
 	}
 
 	memset(String, 0, sizeof(String));
-
 	if (gAirCopyIsSendMode == 0) {
-		sprintf(String, "RCV:%d E:%d", gAirCopyBlockNumber, gErrorsDuringAirCopy);
+		sprintf(String, "RCV:%u E:%u", gAirCopyBlockNumber, gErrorsDuringAirCopy);
 	} else if (gAirCopyIsSendMode == 1) {
-		sprintf(String, "SND:%d", gAirCopyBlockNumber);
+		sprintf(String, "SND:%u", gAirCopyBlockNumber);
 	}
-	UI_PrintString(String, 2, 127, 4, 8, true);
+	UI_PrintString(String, 2, 127, 4, 8);
+
 	ST7565_BlitFullScreen();
 }
 
+#endif

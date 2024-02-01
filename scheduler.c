@@ -14,8 +14,9 @@
  *     limitations under the License.
  */
 
-#if defined(ENABLE_FMRADIO)
-#include "app/fm.h"
+#include "app/chFrScanner.h"
+#ifdef ENABLE_FMRADIO
+	#include "app/fm.h"
 #endif
 #include "app/scanner.h"
 #include "audio.h"
@@ -24,83 +25,89 @@
 #include "misc.h"
 #include "settings.h"
 
+#include "driver/backlight.h"
+#include "bsp/dp32g030/gpio.h"
+#include "driver/gpio.h"
+
+#define DECREMENT(cnt) \
+	do {               \
+		if (cnt > 0)   \
+			cnt--;     \
+	} while (0)
+
 #define DECREMENT_AND_TRIGGER(cnt, flag) \
-	do { \
-		if (cnt) { \
-			if (--cnt == 0) { \
-				flag = true; \
-			} \
-		} \
-	} while(0)
+	do {                                 \
+		if (cnt > 0)                     \
+			if (--cnt == 0)              \
+				flag = true;             \
+	} while (0)
 
 static volatile uint32_t gGlobalSysTickCounter;
 
 void SystickHandler(void);
 
+// we come here every 10ms
 void SystickHandler(void)
 {
 	gGlobalSysTickCounter++;
+	
 	gNextTimeslice = true;
-	if ((gGlobalSysTickCounter % 50) == 0) {
-		gNextTimeslice500ms = true;
-		DECREMENT_AND_TRIGGER(gTxTimerCountdown, gTxTimeoutReached);
+
+	if ((gGlobalSysTickCounter % 50) == 0)
+	{
+		gNextTimeslice_500ms = true;
+		
+		DECREMENT_AND_TRIGGER(gTxTimerCountdown_500ms, gTxTimeoutReached);
+		DECREMENT(gSerialConfigCountDown_500ms);
 	}
-	if ((gGlobalSysTickCounter & 3) == 0) {
+
+	if ((gGlobalSysTickCounter & 3) == 0)
 		gNextTimeslice40ms = true;
-	}
-	if (gSystickCountdown2) {
-		gSystickCountdown2--;
-	}
-	if (gFoundCDCSSCountdown) {
-		gFoundCDCSSCountdown--;
-	}
-	if (gFoundCTCSSCountdown) {
-		gFoundCTCSSCountdown--;
-	}
-	if (gCurrentFunction == FUNCTION_FOREGROUND) {
-		DECREMENT_AND_TRIGGER(gBatterySaveCountdown, gSchedulePowerSave);
-	}
-	if (gCurrentFunction == FUNCTION_POWER_SAVE) {
-		DECREMENT_AND_TRIGGER(gBatterySave, gBatterySaveCountdownExpired);
-	}
 
-	if (gScanState == SCAN_OFF && gCssScanMode == CSS_SCAN_MODE_OFF && gEeprom.DUAL_WATCH != DUAL_WATCH_OFF) {
-		if (gCurrentFunction != FUNCTION_MONITOR && gCurrentFunction != FUNCTION_TRANSMIT) {
-			if (gCurrentFunction != FUNCTION_RECEIVE) {
-				DECREMENT_AND_TRIGGER(gDualWatchCountdown, gScheduleDualWatch);
-			}
-		}
-	}
+	#ifdef ENABLE_NOAA
+		DECREMENT(gNOAACountdown_10ms);
+	#endif
 
-#if defined(ENABLE_NOAA)
-	if (gScanState == SCAN_OFF && gCssScanMode == CSS_SCAN_MODE_OFF && gEeprom.DUAL_WATCH == DUAL_WATCH_OFF) {
-		if (gIsNoaaMode && gCurrentFunction != FUNCTION_MONITOR && gCurrentFunction != FUNCTION_TRANSMIT) {
-			if (gCurrentFunction != FUNCTION_RECEIVE) {
-				DECREMENT_AND_TRIGGER(gNOAA_Countdown, gScheduleNOAA);
-			}
-		}
-	}
-#endif
+	DECREMENT(gFoundCDCSSCountdown_10ms);
 
-	if (gScanState != SCAN_OFF || gCssScanMode == CSS_SCAN_MODE_SCANNING) {
-		if (gCurrentFunction != FUNCTION_MONITOR && gCurrentFunction != FUNCTION_TRANSMIT) {
-			DECREMENT_AND_TRIGGER(ScanPauseDelayIn10msec, gScheduleScanListen);
-		}
-	}
+	DECREMENT(gFoundCTCSSCountdown_10ms);
 
-	DECREMENT_AND_TRIGGER(gTailNoteEliminationCountdown, gFlagTteComplete);
+	if (gCurrentFunction == FUNCTION_FOREGROUND)
+		DECREMENT_AND_TRIGGER(gBatterySaveCountdown_10ms, gSchedulePowerSave);
 
-	DECREMENT_AND_TRIGGER(gCountdownToPlayNextVoice, gFlagPlayQueuedVoice);
+	if (gCurrentFunction == FUNCTION_POWER_SAVE)
+		DECREMENT_AND_TRIGGER(gPowerSave_10ms, gPowerSaveCountdownExpired);
 
-#if defined(ENABLE_FMRADIO)
-	if (gFM_ScanState != FM_SCAN_OFF && gCurrentFunction != FUNCTION_MONITOR) {
-		if (gCurrentFunction != FUNCTION_TRANSMIT && gCurrentFunction != FUNCTION_RECEIVE) {
-			DECREMENT_AND_TRIGGER(gFmPlayCountdown, gScheduleFM);
-		}
-	}
-#endif
-	if (gVoxStopCountdown) {
-		gVoxStopCountdown--;
-	}
+	if (gScanStateDir == SCAN_OFF && !gCssBackgroundScan && gEeprom.DUAL_WATCH != DUAL_WATCH_OFF)
+		if (gCurrentFunction != FUNCTION_MONITOR && gCurrentFunction != FUNCTION_TRANSMIT && gCurrentFunction != FUNCTION_RECEIVE)
+			DECREMENT_AND_TRIGGER(gDualWatchCountdown_10ms, gScheduleDualWatch);
+
+	#ifdef ENABLE_NOAA
+		if (gScanStateDir == SCAN_OFF && !gCssBackgroundScan && gEeprom.DUAL_WATCH == DUAL_WATCH_OFF)
+			if (gIsNoaaMode && gCurrentFunction != FUNCTION_MONITOR && gCurrentFunction != FUNCTION_TRANSMIT)
+				if (gCurrentFunction != FUNCTION_RECEIVE)
+					DECREMENT_AND_TRIGGER(gNOAA_Countdown_10ms, gScheduleNOAA);
+	#endif
+
+	if (gScanStateDir != SCAN_OFF)
+		if (gCurrentFunction != FUNCTION_MONITOR && gCurrentFunction != FUNCTION_TRANSMIT)
+			DECREMENT_AND_TRIGGER(gScanPauseDelayIn_10ms, gScheduleScanListen);
+
+	DECREMENT_AND_TRIGGER(gTailNoteEliminationCountdown_10ms, gFlagTailNoteEliminationComplete);
+
+	#ifdef ENABLE_VOICE
+		DECREMENT_AND_TRIGGER(gCountdownToPlayNextVoice_10ms, gFlagPlayQueuedVoice);
+	#endif
+	
+	#ifdef ENABLE_FMRADIO
+		if (gFM_ScanState != FM_SCAN_OFF && gCurrentFunction != FUNCTION_MONITOR)
+			if (gCurrentFunction != FUNCTION_TRANSMIT && gCurrentFunction != FUNCTION_RECEIVE)
+				DECREMENT_AND_TRIGGER(gFmPlayCountdown_10ms, gScheduleFM);
+	#endif
+
+	#ifdef ENABLE_VOX
+		DECREMENT(gVoxStopCountdown_10ms);
+	#endif
+
+	DECREMENT(boot_counter_10ms);
 }
-

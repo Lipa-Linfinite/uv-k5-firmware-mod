@@ -34,7 +34,6 @@
 #include <sstream>
 #include <math.h>
 
-
 namespace test {
   // use functions in own test namespace to avoid stdio conflicts
   #include "../printf.h"

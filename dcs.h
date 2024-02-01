@@ -19,11 +19,12 @@
 
 #include <stdint.h>
 
-enum DCS_CodeType_t {
-	CODE_TYPE_OFF = 0x00U,
-	CODE_TYPE_CONTINUOUS_TONE = 0x01U,
-	CODE_TYPE_DIGITAL = 0x02U,
-	CODE_TYPE_REVERSE_DIGITAL = 0x03U,
+enum DCS_CodeType_t
+{
+	CODE_TYPE_OFF = 0,
+	CODE_TYPE_CONTINUOUS_TONE,
+	CODE_TYPE_DIGITAL,
+	CODE_TYPE_REVERSE_DIGITAL
 };
 
 typedef enum DCS_CodeType_t DCS_CodeType_t;
@@ -38,7 +39,7 @@ extern const uint16_t DCS_Options[104];
 
 uint32_t DCS_GetGolayCodeWord(DCS_CodeType_t CodeType, uint8_t Option);
 uint8_t DCS_GetCdcssCode(uint32_t Code);
-uint8_t DCS_GetCtcssCode(uint16_t Code);
+uint8_t DCS_GetCtcssCode(int Code);
 
 #endif
 

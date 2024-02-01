@@ -1,4 +1,5 @@
-/* Copyright 2023 Dual Tachyon
+
+/* Copyright 2023 OneOfEleven
  * https://github.com/DualTachyon
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +15,21 @@
  *     limitations under the License.
  */
 
-#ifndef UI_RSSI_H
-#define UI_RSSI_H
+#ifndef AM_FIXH
 
-void UI_UpdateRSSI(uint16_t RSSI);
+#include <stdint.h>
+#include <stdbool.h>
+
+#ifdef ENABLE_AM_FIX
+	void AM_fix_init(void);
+	void AM_fix_reset(const unsigned vfo);
+	void AM_fix_10ms(const unsigned vfo);
+	#ifdef ENABLE_AM_FIX_SHOW_DATA
+		void AM_fix_print_data(const unsigned vfo, char *s);
+	#endif
+	int8_t AM_fix_get_gain_diff();
+	void AM_fix_enable(bool on);
 
 #endif
 
+#endif
